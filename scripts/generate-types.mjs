@@ -1,11 +1,16 @@
 import { compile } from 'json-schema-to-typescript';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const schemaPath = resolve(__dirname, '..', '..', 'DomainCraft', 'spec', 'domain.schema.json');
 const outputPath = resolve(__dirname, '..', 'src', 'types', 'domain.generated.ts');
+
+if (!existsSync(schemaPath)) {
+  console.warn(`Schema not found at ${schemaPath} — skipping type generation (using committed types)`);
+  process.exit(0);
+}
 
 const schema = JSON.parse(readFileSync(schemaPath, 'utf-8'));
 

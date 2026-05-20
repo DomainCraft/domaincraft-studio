@@ -5,7 +5,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: process.env.BASE_PATH || '/DomainCraftGui/',
+  base: process.env.BASE_PATH || '/domaincraft-studio/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
