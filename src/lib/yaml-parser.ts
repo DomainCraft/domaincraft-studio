@@ -112,8 +112,8 @@ export function serializeFieldDefinition(field: ParsedField): string {
     typePart = `relation(${field.target})`;
   } else if (field.type === 'enum' && field.target) {
     typePart = `enum(${field.target})`;
-  } else if (field.isArray && field.target) {
-    typePart = `array(${field.target})`;
+  } else if (field.isArray && field.type !== 'relation') {
+    typePart = `array(${field.type})`;
   }
 
   const validationEntries = Object.entries(field.validations);

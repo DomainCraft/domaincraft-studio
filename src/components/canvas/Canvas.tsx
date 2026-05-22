@@ -14,15 +14,25 @@ export default function Canvas() {
   const schema = useDomainStore(s => s.schema);
   const syncFromSchema = useCanvasStore(s => s.syncFromSchema);
   const selectEntity = useDomainStore(s => s.selectEntity);
+  const selectedEntity = useDomainStore(s => s.selectedEntity);
   const darkMode = useUIStore(s => s.darkMode);
+  const setActiveTab = useUIStore(s => s.setActiveTab);
 
   useEffect(() => {
     syncFromSchema(schema.entities);
   }, [schema, syncFromSchema]);
 
+  // Pass selectedEntity through node data for reliable highlight
+  const nodesWithSelection = nodes.map(n => ({
+    ...n,
+    selected: n.id === selectedEntity,
+    data: { ...n.data, selectedEntity },
+  }));
+
   const onNodeClick = useCallback((_: React.MouseEvent, node: { data: Record<string, unknown> }) => {
     selectEntity(node.data.name as string);
-  }, [selectEntity]);
+    setActiveTab('entities');
+  }, [selectEntity, setActiveTab]);
 
   const onPaneClick = useCallback(() => {
     selectEntity(null);
@@ -31,7 +41,7 @@ export default function Canvas() {
   return (
     <div className="w-full h-full">
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithSelection}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}

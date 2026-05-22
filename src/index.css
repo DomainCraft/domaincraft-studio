@@ -57,6 +57,16 @@
     margin: 0;
     font-family: system-ui, -apple-system, sans-serif;
   }
+  select,
+  input,
+  textarea {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  select option {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+  }
   #root {
     width: 100%;
     height: 100vh;

@@ -17,13 +17,10 @@ function getTypeIcon(type: string) {
     case 'string':
     case 'text': return Type;
     case 'int':
-    case 'int64':
+    case 'bigint':
     case 'float':
-    case 'float64':
     case 'decimal': return Hash;
-    case 'boolean':
-    case 'bool': return ToggleLeft;
-    case 'time.Time':
+    case 'boolean': return ToggleLeft;
     case 'date':
     case 'datetime': return Calendar;
     case 'json':
@@ -33,28 +30,39 @@ function getTypeIcon(type: string) {
   }
 }
 
+function formatFieldType(field: ParsedField): string {
+  if (field.type === 'relation') return `→ ${field.target}`;
+  if (field.type === 'enum') return field.target || 'enum';
+  const base = field.type;
+  return field.isArray ? `${base}[]` : base;
+}
+
 interface EntityNodeData {
   name: string;
   fields: ParsedField[];
   features: string[];
+  selectedEntity?: string | null;
   [key: string]: unknown;
 }
 
 function EntityNode({ data, selected }: NodeProps & { data: EntityNodeData }) {
-  const { name, fields = [], features = [] } = data;
+  const { name, fields = [], features = [], selectedEntity } = data;
   const activeFeatures = features.filter(f => featureIcons[f]);
+  const isSelected = selected || selectedEntity === name;
 
   return (
     <div
-      className={`entity-card rounded-lg shadow-lg border min-w-[220px] max-w-[300px] transition-colors backdrop-blur-sm ${
-        selected
-          ? 'border-blue-500 bg-popover/95'
-          : 'border-border bg-popover/95'
+      className={`entity-card rounded-lg shadow-lg min-w-[220px] max-w-[300px] transition-all duration-150 backdrop-blur-sm ${
+        isSelected
+          ? 'border-2 border-blue-500 bg-popover ring-2 ring-blue-500/30'
+          : 'border border-border bg-popover/95 hover:border-muted-foreground/30'
       }`}
     >
       <Handle type="target" position={Position.Top} className="!bg-blue-500 !w-3 !h-3" />
 
-      <div className="bg-muted rounded-t-lg px-3 py-2 flex items-center gap-2">
+      <div className={`rounded-t-lg px-3 py-2 flex items-center gap-2 ${
+        isSelected ? 'bg-blue-500/10' : 'bg-muted'
+      }`}>
         <span className="font-bold text-foreground text-sm truncate">{name}</span>
         <div className="flex gap-1 ml-auto">
           {activeFeatures.map(feat => {
@@ -101,8 +109,10 @@ function EntityNode({ data, selected }: NodeProps & { data: EntityNodeData }) {
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Required" />
               )}
 
-              <span className="ml-auto text-muted-foreground truncate text-[10px]">
-                {isRelation ? `→ ${field.target}` : field.type}
+              <span className={`ml-auto truncate text-[10px] ${
+                isRelation ? 'text-blue-500' : 'text-muted-foreground'
+              }`}>
+                {formatFieldType(field)}
               </span>
             </div>
           );

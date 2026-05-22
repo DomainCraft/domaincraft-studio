@@ -70,13 +70,15 @@ export default function EntityList() {
             <div
               key={name}
               onClick={() => selectEntity(name)}
-              className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm group transition-colors ${
-                selectedEntity === name ? 'bg-accent' : 'hover:bg-accent/50'
+              className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm group transition-all duration-100 ${
+                selectedEntity === name
+                  ? 'bg-blue-500/10 border-l-2 border-blue-500 pl-1'
+                  : 'border-l-2 border-transparent hover:bg-accent/50'
               }`}
             >
-              <Table2 size={14} className="text-muted-foreground shrink-0" />
+              <Table2 size={14} className={selectedEntity === name ? 'text-blue-500' : 'text-muted-foreground'} />
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{name}</div>
+                <div className={`font-medium truncate ${selectedEntity === name ? 'text-blue-600 dark:text-blue-400' : ''}`}>{name}</div>
                 <div className="text-xs text-muted-foreground">
                   {fieldCount} fields
                   {features.length > 0 && ` · ${features.join(', ')}`}

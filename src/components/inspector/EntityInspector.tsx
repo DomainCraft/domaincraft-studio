@@ -51,8 +51,9 @@ export default function EntityInspector({ entityName }: { entityName: string }) 
 
   return (
     <div className="space-y-4 p-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{entityName}</h3>
+      <div className="flex items-center gap-2">
+        <div className="w-1.5 h-6 rounded-full bg-blue-500" />
+        <h3 className="text-sm font-bold">{entityName}</h3>
       </div>
 
       {/* Feature badges */}
@@ -123,17 +124,21 @@ export default function EntityInspector({ entityName }: { entityName: string }) 
             </div>
           )}
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {Object.entries(fields).map(([name, definition]) => (
               <div
                 key={name}
                 onClick={() => selectField(name)}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs group transition-colors ${
-                  selectedField === name ? 'bg-accent' : 'hover:bg-accent/50'
+                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs group transition-all duration-100 ${
+                  selectedField === name
+                    ? 'bg-blue-500/10 border-l-2 border-blue-500 pl-1.5'
+                    : 'border-l-2 border-transparent hover:bg-accent/50'
                 }`}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{name}</div>
+                  <div className={`font-medium truncate ${selectedField === name ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                    {name}
+                  </div>
                   <div className="text-muted-foreground truncate">{definition}</div>
                 </div>
                 <button

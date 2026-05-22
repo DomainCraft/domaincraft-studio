@@ -30,6 +30,7 @@ entities:
       firstName: string [required, min:2, max:50]
       lastName: string [required, min:2, max:50]
       role: enum(UserRole) [default:Customer]
+      phoneNumbers: array(string)
       isActive: boolean [default:true]
     features:
       - audit
@@ -47,6 +48,7 @@ entities:
       description: text
       price: decimal [required, gte:0]
       sku: string [unique]
+      tags: array(string)
       supplierId: relation(User)
     features:
       - audit

@@ -2,15 +2,16 @@ import { useState, useMemo } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
 import { parseFieldDefinition, serializeFieldDefinition } from '@/lib/yaml-parser';
 import type { ParsedField } from '@/types/domain';
+import TagInput from '@/components/ui/TagInput';
 
 const fieldTypes = [
-  'string', 'text', 'int', 'int64', 'float', 'float64', 'decimal',
-  'boolean', 'bool', 'uuid', 'time.Time', 'date', 'datetime',
+  'string', 'text', 'int', 'bigint', 'float', 'decimal',
+  'boolean', 'uuid', 'date', 'datetime',
   'json', 'jsonb',
 ];
 
 const stringTypes = new Set(['string', 'text']);
-const numericTypes = new Set(['int', 'int64', 'float', 'float64', 'decimal']);
+const numericTypes = new Set(['int', 'bigint', 'float', 'decimal']);
 const formatValidators = ['email', 'url', 'ipv4'];
 
 function getRangeError(v: Record<string, string>): string | null {
@@ -36,12 +37,10 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
 
   const initialParsed = useMemo(() => parseFieldDefinition(fieldName, definition), [fieldName, definition]);
   const [parsed, setParsed] = useState<ParsedField>(initialParsed);
-  const [targetInput, setTargetInput] = useState('');
 
   // Sync when field changes externally
   if (parsed.name !== fieldName || parsed.type !== initialParsed.type) {
     setParsed(initialParsed);
-    setTargetInput(initialParsed.target || '');
   }
 
   const updateParsed = (updates: Partial<ParsedField>) => {
@@ -84,7 +83,7 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
     const next: ParsedField = {
       ...parsed,
       type: newType,
-      target: ['relation', 'enum', 'array'].includes(newType) ? targetInput : undefined,
+      target: ['relation', 'enum'].includes(newType) ? parsed.target : undefined,
     };
     // Remove format validators if not string type
     if (!stringTypes.has(newType)) {
@@ -112,6 +111,7 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
   const isString = stringTypes.has(parsed.type);
   const isNumeric = numericTypes.has(parsed.type);
   const hasFormatValidator = formatValidators.some((fv) => parsed.validations[fv] === 'true');
+  const canBeArray = !isRelation && !isEnum;
 
   return (
     <div className="space-y-3">
@@ -130,40 +130,57 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
           ))}
           <option value="relation">relation</option>
           <option value="enum">enum</option>
-          <option value="array">array</option>
         </select>
       </div>
+
+      {canBeArray && (
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={parsed.isArray || false}
+            onChange={(e) => updateParsed({ isArray: e.target.checked })}
+            className="rounded"
+          />
+          Array (list of values)
+        </label>
+      )}
 
       {(isRelation || isEnum) && (
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">
             {isRelation ? 'Target Entity' : 'Enum Name'}
           </label>
-          <input
-            type="text"
-            value={targetInput}
+          <select
+            value={parsed.target || ''}
             onChange={(e) => {
-              setTargetInput(e.target.value);
               updateParsed({ target: e.target.value });
             }}
             className="w-full px-2 py-1.5 text-xs rounded border bg-transparent"
             style={{ borderColor: 'hsl(var(--border))' }}
-            placeholder={isRelation ? 'e.g. Order' : 'e.g. Status'}
-          />
+          >
+            <option value="">-- Select --</option>
+            {isRelation
+              ? Object.keys(schema.entities).map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))
+              : Object.keys(schema.enums || {}).map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))
+            }
+          </select>
         </div>
       )}
 
       {isRelation && (
-        <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-xs">
           <input
             type="checkbox"
-            id={`${fieldName}-many`}
             checked={parsed.isArray || false}
             onChange={(e) => updateParsed({ isArray: e.target.checked })}
             className="rounded"
           />
-          <label htmlFor={`${fieldName}-many`} className="text-xs">Many (array)</label>
-        </div>
+          One-to-many
+        </label>
       )}
 
       <div className="space-y-2">
@@ -356,14 +373,40 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
         {/* Default value */}
         <div>
           <label className="text-xs text-muted-foreground">default</label>
-          <input
-            type="text"
-            value={parsed.validations['default'] || ''}
-            onChange={(e) => updateValidation('default', e.target.value || null)}
-            className="w-full px-2 py-1 text-xs rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-            placeholder="default value"
-          />
+          {parsed.isArray ? (
+            <TagInput
+              tags={(() => {
+                const raw = parsed.validations['default'] || '';
+                if (!raw || raw === '[]') return [];
+                return raw.replace(/^\[|\]$/g, '').split(',').map(s => s.trim()).filter(Boolean);
+              })()}
+              onChange={(tags) => {
+                updateValidation('default', tags.length > 0 ? `[${tags.join(', ')}]` : null);
+              }}
+              placeholder="Add items..."
+            />
+          ) : isEnum && parsed.target && schema.enums?.[parsed.target] ? (
+            <select
+              value={parsed.validations['default'] || ''}
+              onChange={(e) => updateValidation('default', e.target.value || null)}
+              className="w-full px-2 py-1.5 text-xs rounded border bg-transparent"
+              style={{ borderColor: 'hsl(var(--border))' }}
+            >
+              <option value="">-- None --</option>
+              {schema.enums[parsed.target].map((val) => (
+                <option key={val} value={val}>{val}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={parsed.validations['default'] || ''}
+              onChange={(e) => updateValidation('default', e.target.value || null)}
+              className="w-full px-2 py-1 text-xs rounded border bg-transparent"
+              style={{ borderColor: 'hsl(var(--border))' }}
+              placeholder="default value"
+            />
+          )}
         </div>
 
         {/* Regex (string only) */}
