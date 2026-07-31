@@ -1,4 +1,5 @@
 import { useDomainStore } from '@/stores/domain-store';
+import { useShallow } from 'zustand/react/shallow';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
 import FormSection from '@/components/ui/FormSection';
@@ -6,7 +7,9 @@ import TagInput from '@/components/ui/TagInput';
 
 export default function AuthSettings() {
   const auth = useDomainStore((s) => s.schema.auth);
-  const entityNames = useDomainStore((s) => Object.keys(s.schema.entities));
+  const entityNames = useDomainStore(
+    useShallow((s) => Object.keys(s.schema.entities))
+  );
   const updateAuth = useDomainStore((s) => s.updateAuth);
 
   return (

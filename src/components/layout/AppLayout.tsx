@@ -28,7 +28,7 @@ export default function AppLayout() {
         <Toolbar />
         <div className="flex flex-1 min-h-0">
           {leftPanelOpen && (
-            <div className="w-64 border-r border-themed shrink-0 overflow-y-auto scrollbar-thin bg-themed-card">
+            <div className="w-64 border-r border-themed shrink-0 overflow-y-auto scrollbar-thin bg-themed-card hover:bg-accent/5 transition-colors">
               <Explorer />
             </div>
           )}
@@ -52,7 +52,7 @@ export default function AppLayout() {
           </div>
 
           {rightPanelOpen && (
-            <div className="w-80 border-l border-themed shrink-0 overflow-y-auto scrollbar-thin bg-themed-card">
+            <div className="w-80 border-l border-themed shrink-0 overflow-y-auto scrollbar-thin bg-themed-card hover:bg-accent/5 transition-colors">
               <Inspector />
             </div>
           )}

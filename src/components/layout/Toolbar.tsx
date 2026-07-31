@@ -79,7 +79,7 @@ export default function Toolbar() {
             onClick={() => setViewMode(mode)}
             className={`flex items-center gap-1.5 px-2.5 py-1 font-medium ${
               viewMode === mode
-                ? 'bg-background shadow-sm text-foreground hover:bg-background'
+                ? 'bg-background shadow-sm text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
             title={label}
@@ -103,7 +103,7 @@ export default function Toolbar() {
           title="Core validator version"
           className="text-xs text-muted-foreground font-mono px-2 select-none"
         >
-          v{wasmVersion}
+          {wasmVersion}
         </span>
       )}
 

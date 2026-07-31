@@ -6,8 +6,10 @@ import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import AddItem from '@/components/ui/AddItem';
 
+const EMPTY_ENUMS: Record<string, string[]> = {};
+
 export default function EnumManager() {
-  const enums = useDomainStore((s) => s.schema.enums || {});
+  const enums = useDomainStore((s) => s.schema.enums ?? EMPTY_ENUMS);
   const addEnum = useDomainStore((s) => s.addEnum);
   const removeEnum = useDomainStore((s) => s.removeEnum);
   const updateEnum = useDomainStore((s) => s.updateEnum);
