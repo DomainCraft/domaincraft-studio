@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "generate:types": "node scripts/generate-types.mjs",
-    "prebuild": "npm run generate:types",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

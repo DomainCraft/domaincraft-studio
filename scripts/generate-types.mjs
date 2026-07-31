@@ -7,6 +7,11 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const coreDir = resolve(__dirname, '..', '..', 'DomainCraft');
 
+if (!existsSync(coreDir)) {
+  console.warn(`Core repo not found at ${coreDir} — skipping type generation`);
+  process.exit(0);
+}
+
 // --- 1. Generate TypeScript types from JSON Schema ---
 
 const schemaPath = resolve(coreDir, 'spec', 'domain.schema.json');
