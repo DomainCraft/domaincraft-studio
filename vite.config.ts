@@ -11,4 +11,27 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@xyflow/react') || id.includes('reactflow')) {
+              return 'reactflow';
+            }
+            if (id.includes('@monaco-editor/react') || id.includes('monaco-editor')) {
+              return 'monaco';
+            }
+            if (id.includes('zustand')) {
+              return 'state';
+            }
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 400,
+  },
 })

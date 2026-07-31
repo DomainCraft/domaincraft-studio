@@ -1,129 +1,106 @@
 import { useDomainStore } from '@/stores/domain-store';
-import type { DomainSchema } from '@/types/domain';
+import { DATABASES, API_STYLES, MULTI_TENANCY_MODES } from '@/lib/constants';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Checkbox from '@/components/ui/Checkbox';
+import FormSection from '@/components/ui/FormSection';
+import AuthSettings from './AuthSettings';
+import CacheSettings from './CacheSettings';
+import CorsSettings from './CorsSettings';
+import DeploySettings from './DeploySettings';
+import type { DomainSchema, MultiTenancy } from '@/types/domain';
 
 export default function ProjectSettings() {
-  const { schema, updateProject, updateSchemaField } = useDomainStore();
-  const { project } = schema;
+  const project = useDomainStore((s) => s.schema.project);
+  const database = useDomainStore((s) => s.schema.database);
+  const api_style = useDomainStore((s) => s.schema.api_style);
+  const updateProject = useDomainStore((s) => s.updateProject);
+  const updateSchemaField = useDomainStore((s) => s.updateSchemaField);
 
   return (
-    <div className="space-y-4">
-      <span className="text-xs font-semibold uppercase text-muted-foreground">Project</span>
+    <div className="space-y-5">
+      <FormSection label="Project">
+        <Input
+          label="Name"
+          value={project.name}
+          onChange={(e) => updateProject({ name: e.target.value })}
+        />
 
-      <div className="space-y-3">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Name</label>
-          <input
-            type="text"
-            value={project.name}
-            onChange={(e) => updateProject({ name: e.target.value })}
-            className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-          />
-        </div>
+        <Input
+          label="Description"
+          value={project.description || ''}
+          onChange={(e) => updateProject({ description: e.target.value || undefined })}
+          placeholder="Optional"
+        />
 
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Description</label>
-          <input
-            type="text"
-            value={project.description || ''}
-            onChange={(e) => updateProject({ description: e.target.value || undefined })}
-            className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-            placeholder="Optional"
-          />
-        </div>
+        <Input
+          label="Version"
+          value={project.version || ''}
+          onChange={(e) => updateProject({ version: e.target.value || undefined })}
+          placeholder="1.0.0"
+        />
 
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Version</label>
-          <input
-            type="text"
-            value={project.version || ''}
-            onChange={(e) => updateProject({ version: e.target.value || undefined })}
-            className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-            placeholder="1.0.0"
-          />
-        </div>
+        <Input
+          label="Platform"
+          value={project.platform || ''}
+          onChange={(e) => updateProject({ platform: e.target.value || undefined })}
+          placeholder="e.g. net9.0"
+        />
 
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Database</label>
-          <select
-            value={schema.database || 'postgresql'}
-            onChange={(e) => updateSchemaField('database', e.target.value as DomainSchema['database'])}
-            className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-          >
-            <option value="postgresql">PostgreSQL</option>
-            <option value="mysql">MySQL</option>
-            <option value="sqlite">SQLite</option>
-            <option value="mssql">MSSQL</option>
-            <option value="mongodb">MongoDB</option>
-          </select>
-        </div>
+        <Select
+          label="Database"
+          value={database || 'postgresql'}
+          onChange={(e) => updateSchemaField('database', e.target.value as DomainSchema['database'])}
+        >
+          {DATABASES.map((db) => (
+            <option key={db} value={db}>{db}</option>
+          ))}
+        </Select>
 
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Auth</label>
-          <input
-            type="text"
-            value={schema.auth || ''}
-            onChange={(e) => updateSchemaField('auth', e.target.value || undefined)}
-            className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-            placeholder="jwt"
-          />
-        </div>
+        <Select
+          label="API Style"
+          value={api_style || 'rest'}
+          onChange={(e) => updateSchemaField('api_style', e.target.value as DomainSchema['api_style'])}
+        >
+          {API_STYLES.map((style) => (
+            <option key={style} value={style}>{style}</option>
+          ))}
+        </Select>
+      </FormSection>
 
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">API Style</label>
-          <select
-            value={schema.api_style || 'rest'}
-            onChange={(e) => updateSchemaField('api_style', e.target.value as DomainSchema['api_style'])}
-            className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-          >
-            <option value="rest">REST</option>
-            <option value="graphql">GraphQL</option>
-            <option value="grpc">gRPC</option>
-          </select>
-        </div>
+      <AuthSettings />
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="multi-tenancy"
-            checked={project.multi_tenancy?.enabled || false}
-            onChange={(e) =>
-              updateProject({
-                multi_tenancy: { enabled: e.target.checked, mode: e.target.checked ? 'column' : undefined },
-              })
-            }
-            className="rounded"
-          />
-          <label htmlFor="multi-tenancy" className="text-sm">
-            Multi-tenancy
-          </label>
-        </div>
+      <FormSection label="Multi-tenancy">
+        <Checkbox
+          checked={project.multi_tenancy?.enabled || false}
+          onChange={(checked) =>
+            updateProject({
+              multi_tenancy: { enabled: checked, mode: checked ? 'column' : undefined },
+            })
+          }
+          label="Enable multi-tenancy"
+        />
 
         {project.multi_tenancy?.enabled && (
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Tenancy Mode</label>
-            <select
-              value={project.multi_tenancy.mode || 'column'}
-              onChange={(e) =>
-                updateProject({
-                  multi_tenancy: { ...project.multi_tenancy!, mode: e.target.value },
-                })
-              }
-              className="w-full px-2 py-1.5 text-sm rounded border bg-transparent"
-              style={{ borderColor: 'hsl(var(--border))' }}
-            >
-              <option value="column">Column</option>
-              <option value="schema">Schema</option>
-              <option value="database">Database</option>
-            </select>
-          </div>
+          <Select
+            label="Mode"
+            value={project.multi_tenancy.mode || 'column'}
+            onChange={(e) =>
+              updateProject({
+                multi_tenancy: { enabled: true, ...project.multi_tenancy, mode: e.target.value as MultiTenancy['mode'] },
+              })
+            }
+          >
+            {MULTI_TENANCY_MODES.map((mode) => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </Select>
         )}
-      </div>
+      </FormSection>
+
+      <CacheSettings />
+      <CorsSettings />
+      <DeploySettings />
     </div>
   );
 }

@@ -8,8 +8,10 @@ export interface ParsedField {
   validations: Record<string, string>;
 }
 
-// Re-export all generated types from the JSON Schema
+// Re-export all generated types from the JSON Schema (single source of truth)
 export type {
+  AuthConfig,
+  CacheConfig,
   DomainSchema,
   Project,
   MultiTenancy,

@@ -1,22 +1,17 @@
 import { useState } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
+import AddItem from '@/components/ui/AddItem';
 
 export default function EnumManager() {
-  const { schema, addEnum, removeEnum, updateEnum } = useDomainStore();
-  const [newName, setNewName] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
+  const enums = useDomainStore((s) => s.schema.enums || {});
+  const addEnum = useDomainStore((s) => s.addEnum);
+  const removeEnum = useDomainStore((s) => s.removeEnum);
+  const updateEnum = useDomainStore((s) => s.updateEnum);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
-
-  const enums = schema.enums || {};
-
-  const handleAdd = () => {
-    const name = newName.trim();
-    if (!name || enums[name]) return;
-    addEnum(name, []);
-    setNewName('');
-    setShowAdd(false);
-  };
 
   const handleAddValue = (enumName: string) => {
     const val = (editValues[enumName] || '').trim();
@@ -34,75 +29,60 @@ export default function EnumManager() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase text-muted-foreground">Enums</span>
-        <button onClick={() => setShowAdd(!showAdd)} className="p-1 rounded hover:bg-accent">
-          <Plus size={14} />
-        </button>
-      </div>
-
-      {showAdd && (
-        <div className="flex gap-1">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            placeholder="Enum name..."
-            className="flex-1 px-2 py-1 text-xs rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-            autoFocus
-          />
-          <button onClick={handleAdd} className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700">
-            Add
-          </button>
-        </div>
-      )}
+      <AddItem
+        label="Enums"
+        placeholder="Enum name..."
+        onAdd={(name) => addEnum(name, [])}
+        validate={(name) => !enums[name]}
+      />
 
       <div className="space-y-3">
         {Object.entries(enums).map(([name, values]) => (
-          <div key={name} className="rounded border p-2 space-y-2" style={{ borderColor: 'hsl(var(--border))' }}>
+          <div key={name} className="rounded border p-2 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">{name}</span>
-              <button onClick={() => removeEnum(name)} className="p-1 rounded hover:bg-destructive/10 hover:text-destructive">
+              <Button
+                variant="destructive"
+                size="icon"
+                onClick={() => removeEnum(name)}
+              >
                 <Trash2 size={12} />
-              </button>
+              </Button>
             </div>
 
             <div className="flex flex-wrap gap-1">
               {values.map((val) => (
                 <span
                   key={val}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-full"
-                  style={{ background: 'hsl(var(--muted))' }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-full bg-muted"
                 >
                   {val}
-                  <button onClick={() => handleRemoveValue(name, val)} className="hover:text-destructive">
+                  <Button
+                    variant="destructive"
+                    className="p-0.5 hover:text-destructive"
+                    onClick={() => handleRemoveValue(name, val)}
+                  >
                     <X size={10} />
-                  </button>
+                  </Button>
                 </span>
               ))}
             </div>
 
             <div className="flex gap-1">
-              <input
-                type="text"
+              <Input
                 value={editValues[name] || ''}
                 onChange={(e) => setEditValues((prev) => ({ ...prev, [name]: e.target.value }))}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddValue(name)}
                 placeholder="Add value..."
-                className="flex-1 px-2 py-1 text-xs rounded border bg-transparent"
-                style={{ borderColor: 'hsl(var(--border))' }}
+                className="flex-1"
               />
-              <button onClick={() => handleAddValue(name)} className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700">
-                +
-              </button>
+              <Button onClick={() => handleAddValue(name)} size="sm">+</Button>
             </div>
           </div>
         ))}
 
         {Object.keys(enums).length === 0 && (
-          <div className="text-xs text-muted-foreground text-center py-4">No enums defined</div>
+          <EmptyState message="No enums defined" />
         )}
       </div>
     </div>

@@ -1,37 +1,47 @@
 import { ReactFlow, Background, Controls, MiniMap, BackgroundVariant } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import EntityNode from './EntityNode';
-import { edgeTypes } from '@/components/edges/edge-types';
+import { edgeTypes, CrowFootMarkerDefs } from '@/components/edges/edge-types';
 import { useCanvasStore } from '@/stores/canvas-store';
 import { useDomainStore } from '@/stores/domain-store';
 import { useUIStore } from '@/stores/ui-store';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { parseFieldDefinition } from '@/lib/yaml-parser';
 
 const nodeTypes = { entity: EntityNode };
 
 export default function Canvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange } = useCanvasStore();
-  const schema = useDomainStore(s => s.schema);
-  const syncFromSchema = useCanvasStore(s => s.syncFromSchema);
-  const selectEntity = useDomainStore(s => s.selectEntity);
-  const selectedEntity = useDomainStore(s => s.selectedEntity);
-  const darkMode = useUIStore(s => s.darkMode);
-  const setActiveTab = useUIStore(s => s.setActiveTab);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const onNodesChange = useCanvasStore((s) => s.onNodesChange);
+  const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
+  const syncFromSchema = useCanvasStore((s) => s.syncFromSchema);
+  const setSelectedNode = useCanvasStore((s) => s.setSelectedNode);
+  const schemaVersion = useDomainStore((s) => s.schemaVersion);
+  const entities = useDomainStore((s) => s.schema.entities);
+  const selectEntity = useDomainStore((s) => s.selectEntity);
+  const selectedEntity = useDomainStore((s) => s.selectedEntity);
+  const darkMode = useUIStore((s) => s.darkMode);
+  const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const prevVersionRef = useRef(schemaVersion);
 
   useEffect(() => {
-    syncFromSchema(schema.entities);
-  }, [schema, syncFromSchema]);
+    if (schemaVersion !== prevVersionRef.current) {
+      prevVersionRef.current = schemaVersion;
+      syncFromSchema(entities, parseFieldDefinition);
+    }
+  }, [schemaVersion, entities, syncFromSchema]);
 
-  // Pass selectedEntity through node data for reliable highlight
-  const nodesWithSelection = nodes.map(n => ({
-    ...n,
-    selected: n.id === selectedEntity,
-    data: { ...n.data, selectedEntity },
-  }));
+  useEffect(() => {
+    setSelectedNode(selectedEntity);
+  }, [selectedEntity, nodes, setSelectedNode]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: { data: Record<string, unknown> }) => {
-    selectEntity(node.data.name as string);
-    setActiveTab('entities');
+    const name = node.data.name;
+    if (typeof name === 'string') {
+      selectEntity(name);
+      setActiveTab('entities');
+    }
   }, [selectEntity, setActiveTab]);
 
   const onPaneClick = useCallback(() => {
@@ -41,7 +51,7 @@ export default function Canvas() {
   return (
     <div className="w-full h-full">
       <ReactFlow
-        nodes={nodesWithSelection}
+        nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -53,6 +63,7 @@ export default function Canvas() {
         fitView
         proOptions={{ hideAttribution: true }}
       >
+        {CrowFootMarkerDefs}
         <Background
           variant={BackgroundVariant.Dots}
           gap={16}

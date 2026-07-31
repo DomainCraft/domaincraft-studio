@@ -1,446 +1,160 @@
-import { useState, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
-import { parseFieldDefinition, serializeFieldDefinition } from '@/lib/yaml-parser';
-import type { ParsedField } from '@/types/domain';
-import TagInput from '@/components/ui/TagInput';
-
-const fieldTypes = [
-  'string', 'text', 'int', 'bigint', 'float', 'decimal',
-  'boolean', 'uuid', 'date', 'datetime',
-  'json', 'jsonb',
-];
-
-const stringTypes = new Set(['string', 'text']);
-const numericTypes = new Set(['int', 'bigint', 'float', 'decimal']);
-const formatValidators = ['email', 'url', 'ipv4'];
-
-function getRangeError(v: Record<string, string>): string | null {
-  const min = parseFloat(v['min']);
-  const max = parseFloat(v['max']);
-  if (!isNaN(min) && !isNaN(max) && min > max) return 'min cannot be greater than max';
-  // Check lower bound vs upper bound (any combination)
-  const lower = parseFloat(v['gte'] ?? v['gt']);
-  const upper = parseFloat(v['lte'] ?? v['lt']);
-  if (!isNaN(lower) && !isNaN(upper)) {
-    if (lower > upper) return 'Lower bound cannot exceed upper bound';
-    if (lower === upper && (v['gt'] !== undefined || v['lt'] !== undefined)) {
-      return 'Lower bound must be less than upper bound';
-    }
-  }
-  return null;
-}
+import { PRIMITIVE_FIELD_TYPES, STRING_FIELD_TYPES, NUMERIC_FIELD_TYPES, ON_DELETE_VALUES, STRING_FORMAT_VALIDATORS, NUMERIC_VALIDATION_MODIFIERS } from '@/lib/constants';
+import { useFieldEditor } from '@/hooks/useFieldEditor';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Checkbox from '@/components/ui/Checkbox';
+import NumericBoundEditor from './NumericBoundEditor';
+import FormatValidator from './FormatValidator';
+import DefaultValueEditor from './DefaultValueEditor';
+import RelationConfig from './RelationConfig';
+import EnumConfig from './EnumConfig';
 
 export default function FieldEditor({ entityName, fieldName }: { entityName: string; fieldName: string }) {
-  const { schema, updateField } = useDomainStore();
-  const entity = schema.entities[entityName];
-  const definition = entity?.fields[fieldName] || '';
+  const enums = useDomainStore((s) => s.schema.enums);
+  const allEntities = useDomainStore((s) => s.schema.entities);
+  const { localParsed, applyUpdate, updateValidation, setFormatValidator } = useFieldEditor(entityName, fieldName);
 
-  const initialParsed = useMemo(() => parseFieldDefinition(fieldName, definition), [fieldName, definition]);
-  const [parsed, setParsed] = useState<ParsedField>(initialParsed);
-
-  // Sync when field changes externally
-  if (parsed.name !== fieldName || parsed.type !== initialParsed.type) {
-    setParsed(initialParsed);
-  }
-
-  const updateParsed = (updates: Partial<ParsedField>) => {
-    const next = { ...parsed, ...updates };
-    setParsed(next);
-    const newDef = serializeFieldDefinition(next);
-    updateField(entityName, fieldName, newDef);
-  };
-
-  const updateValidation = (key: string, value: string | null) => {
-    const next = { ...parsed };
-    if (value === null) {
-      delete next.validations[key];
-    } else {
-      next.validations[key] = value;
-    }
-    setParsed(next);
-    const newDef = serializeFieldDefinition(next);
-    updateField(entityName, fieldName, newDef);
-  };
-
-  // Set a format validator, removing other format validators (mutually exclusive)
-  const setFormatValidator = (key: string) => {
-    const next = { ...parsed };
-    if (next.validations[key] === 'true') {
-      // Toggle off
-      delete next.validations[key];
-    } else {
-      // Remove other format validators, set this one
-      formatValidators.forEach((fv) => delete next.validations[fv]);
-      next.validations[key] = 'true';
-    }
-    setParsed(next);
-    const newDef = serializeFieldDefinition(next);
-    updateField(entityName, fieldName, newDef);
-  };
-
-  // Clear type-incompatible validations when type changes
-  const handleTypeChange = (newType: string) => {
-    const next: ParsedField = {
-      ...parsed,
+  const handleTypeChange = useCallback((newType: string) => {
+    const next = {
+      ...localParsed,
       type: newType,
-      target: ['relation', 'enum'].includes(newType) ? parsed.target : undefined,
+      target: ['relation', 'enum'].includes(newType) ? localParsed.target : undefined,
+      validations: { ...localParsed.validations },
     };
-    // Remove format validators if not string type
-    if (!stringTypes.has(newType)) {
-      formatValidators.forEach((fv) => delete next.validations[fv]);
+    if (!STRING_FIELD_TYPES.has(newType)) {
+      for (const key of [...STRING_FORMAT_VALIDATORS, 'min', 'max', 'regex']) {
+        delete next.validations[key];
+      }
     }
-    // Remove string-length validators if not string type
-    if (!stringTypes.has(newType)) {
-      delete next.validations.min;
-      delete next.validations.max;
+    if (!NUMERIC_FIELD_TYPES.has(newType)) {
+      for (const key of NUMERIC_VALIDATION_MODIFIERS) {
+        delete next.validations[key];
+      }
     }
-    // Remove numeric validators if not numeric type
-    if (!numericTypes.has(newType)) {
-      delete next.validations.gte;
-      delete next.validations.lte;
-      delete next.validations.gt;
-      delete next.validations.lt;
-    }
-    setParsed(next);
-    const newDef = serializeFieldDefinition(next);
-    updateField(entityName, fieldName, newDef);
-  };
+    applyUpdate(next);
+  }, [localParsed, applyUpdate]);
 
-  const isRelation = parsed.type === 'relation';
-  const isEnum = parsed.type === 'enum';
-  const isString = stringTypes.has(parsed.type);
-  const isNumeric = numericTypes.has(parsed.type);
-  const hasFormatValidator = formatValidators.some((fv) => parsed.validations[fv] === 'true');
-  const canBeArray = !isRelation && !isEnum;
+  const isRelation = localParsed.type === 'relation';
+  const isEnum = localParsed.type === 'enum';
+  const isString = STRING_FIELD_TYPES.has(localParsed.type);
+  const isNumeric = NUMERIC_FIELD_TYPES.has(localParsed.type);
+  const canBeArray = !isRelation;
 
   return (
     <div className="space-y-3">
       <span className="text-xs font-semibold uppercase text-muted-foreground">Field: {fieldName}</span>
 
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">Type</label>
-        <select
-          value={parsed.type}
-          onChange={(e) => handleTypeChange(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs rounded border bg-transparent"
-          style={{ borderColor: 'hsl(var(--border))' }}
-        >
-          {fieldTypes.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-          <option value="relation">relation</option>
-          <option value="enum">enum</option>
-        </select>
-      </div>
+      <Select
+        label="Type"
+        value={localParsed.type}
+        onChange={(e) => handleTypeChange(e.target.value)}
+      >
+        {PRIMITIVE_FIELD_TYPES.map((t) => (
+          <option key={t} value={t}>{t}</option>
+        ))}
+        <option value="relation">relation</option>
+        <option value="enum">enum</option>
+      </Select>
 
       {canBeArray && (
-        <label className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={parsed.isArray || false}
-            onChange={(e) => updateParsed({ isArray: e.target.checked })}
-            className="rounded"
-          />
-          Array (list of values)
-        </label>
-      )}
-
-      {(isRelation || isEnum) && (
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            {isRelation ? 'Target Entity' : 'Enum Name'}
-          </label>
-          <select
-            value={parsed.target || ''}
-            onChange={(e) => {
-              updateParsed({ target: e.target.value });
-            }}
-            className="w-full px-2 py-1.5 text-xs rounded border bg-transparent"
-            style={{ borderColor: 'hsl(var(--border))' }}
-          >
-            <option value="">-- Select --</option>
-            {isRelation
-              ? Object.keys(schema.entities).map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))
-              : Object.keys(schema.enums || {}).map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))
-            }
-          </select>
-        </div>
+        <Checkbox
+          checked={localParsed.isArray || false}
+          onChange={(checked) => applyUpdate({ ...localParsed, isArray: checked })}
+          label="Array (list of values)"
+        />
       )}
 
       {isRelation && (
-        <label className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={parsed.isArray || false}
-            onChange={(e) => updateParsed({ isArray: e.target.checked })}
-            className="rounded"
-          />
-          One-to-many
-        </label>
+        <RelationConfig
+          parsed={localParsed}
+          entities={allEntities}
+          onUpdate={(field) => applyUpdate({ ...localParsed, ...field })}
+        />
+      )}
+
+      {isEnum && (
+        <EnumConfig
+          parsed={localParsed}
+          enums={enums}
+          onUpdate={(field) => applyUpdate({ ...localParsed, ...field })}
+        />
       )}
 
       <div className="space-y-2">
         <span className="text-xs font-semibold uppercase text-muted-foreground">Validations</span>
 
-        {/* General flags */}
         <div className="grid grid-cols-2 gap-1.5">
-          {['required', 'unique', 'hidden', 'primary'].map((key) => (
-            <label key={key} className="flex items-center gap-1.5 text-xs">
-              <input
-                type="checkbox"
-                checked={parsed.validations[key] === 'true'}
-                onChange={(e) => updateValidation(key, e.target.checked ? 'true' : null)}
-                className="rounded"
-              />
-              {key}
-            </label>
+          {(['required', 'unique', 'hidden', 'primary'] as const).map((key) => (
+            <Checkbox
+              key={key}
+              checked={localParsed.validations[key] === 'true'}
+              onChange={(checked) => updateValidation(key, checked ? 'true' : null)}
+              label={key}
+            />
           ))}
         </div>
 
-        {/* Format validators (string only, mutually exclusive) */}
         {isString && (
-          <div>
-            <span className="text-xs text-muted-foreground mb-1 block">Format</span>
-            <div className="flex gap-1.5">
-              {formatValidators.map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setFormatValidator(key)}
-                  className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                    parsed.validations[key] === 'true'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-border hover:bg-accent'
-                  }`}
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
-            {hasFormatValidator && (
-              <p className="text-[10px] text-muted-foreground mt-1">Only one format validator allowed</p>
-            )}
+          <FormatValidator validations={localParsed.validations} onToggle={setFormatValidator} />
+        )}
+
+        {isString && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <Input
+              label="min length"
+              type="number"
+              value={localParsed.validations['min'] || ''}
+              onChange={(e) => updateValidation('min', e.target.value || null)}
+              placeholder="0"
+            />
+            <Input
+              label="max length"
+              type="number"
+              value={localParsed.validations['max'] || ''}
+              onChange={(e) => updateValidation('max', e.target.value || null)}
+              placeholder="255"
+            />
           </div>
         )}
 
-        {/* String length validators */}
-        {isString && (
-          <div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <div>
-                <label className="text-xs text-muted-foreground">min length</label>
-                <input
-                  type="number"
-                  value={parsed.validations['min'] || ''}
-                  onChange={(e) => updateValidation('min', e.target.value || null)}
-                  className={`w-full px-2 py-1 text-xs rounded border bg-transparent ${
-                    getRangeError(parsed.validations) ? 'border-red-500' : ''
-                  }`}
-                  style={{ borderColor: getRangeError(parsed.validations) ? undefined : 'hsl(var(--border))' }}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">max length</label>
-                <input
-                  type="number"
-                  value={parsed.validations['max'] || ''}
-                  onChange={(e) => updateValidation('max', e.target.value || null)}
-                  className={`w-full px-2 py-1 text-xs rounded border bg-transparent ${
-                    getRangeError(parsed.validations) ? 'border-red-500' : ''
-                  }`}
-                  style={{ borderColor: getRangeError(parsed.validations) ? undefined : 'hsl(var(--border))' }}
-                  placeholder="255"
-                />
-              </div>
-            </div>
-            {getRangeError(parsed.validations) && (
-              <p className="text-[10px] text-red-500 mt-1">{getRangeError(parsed.validations)}</p>
-            )}
-          </div>
-        )}
-
-        {/* Numeric comparison validators — paired bounds */}
         {isNumeric && (
-          <div>
-            <div className="space-y-1.5">
-              {/* Lower bound */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => {
-                    const next = { ...parsed };
-                    const val = next.validations['gte'] ?? next.validations['gt'] ?? '';
-                    delete next.validations['gte'];
-                    delete next.validations['gt'];
-                    next.validations['gte'] = val;
-                    setParsed(next);
-                    updateField(entityName, fieldName, serializeFieldDefinition(next));
-                  }}
-                  className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
-                    parsed.validations['gte'] !== undefined ? 'bg-blue-600 text-white border-blue-600' : 'border-border'
-                  }`}
-                >
-                  &gt;=
-                </button>
-                <button
-                  onClick={() => {
-                    const next = { ...parsed };
-                    const val = next.validations['gte'] ?? next.validations['gt'] ?? '';
-                    delete next.validations['gte'];
-                    delete next.validations['gt'];
-                    next.validations['gt'] = val;
-                    setParsed(next);
-                    updateField(entityName, fieldName, serializeFieldDefinition(next));
-                  }}
-                  className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
-                    parsed.validations['gt'] !== undefined ? 'bg-blue-600 text-white border-blue-600' : 'border-border'
-                  }`}
-                >
-                  &gt;
-                </button>
-                <input
-                  type="number"
-                  value={parsed.validations['gte'] || parsed.validations['gt'] || ''}
-                  onChange={(e) => {
-                    const key = parsed.validations['gt'] !== undefined ? 'gt' : 'gte';
-                    updateValidation(key, e.target.value || null);
-                  }}
-                  className={`flex-1 px-2 py-1 text-xs rounded border bg-transparent ${
-                    getRangeError(parsed.validations) ? 'border-red-500' : ''
-                  }`}
-                  style={{ borderColor: getRangeError(parsed.validations) ? undefined : 'hsl(var(--border))' }}
-                  placeholder="min"
-                />
-              </div>
-              {/* Upper bound */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => {
-                    const next = { ...parsed };
-                    const val = next.validations['lte'] ?? next.validations['lt'] ?? '';
-                    delete next.validations['lte'];
-                    delete next.validations['lt'];
-                    next.validations['lte'] = val;
-                    setParsed(next);
-                    updateField(entityName, fieldName, serializeFieldDefinition(next));
-                  }}
-                  className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
-                    parsed.validations['lte'] !== undefined ? 'bg-blue-600 text-white border-blue-600' : 'border-border'
-                  }`}
-                >
-                  &lt;=
-                </button>
-                <button
-                  onClick={() => {
-                    const next = { ...parsed };
-                    const val = next.validations['lte'] ?? next.validations['lt'] ?? '';
-                    delete next.validations['lte'];
-                    delete next.validations['lt'];
-                    next.validations['lt'] = val;
-                    setParsed(next);
-                    updateField(entityName, fieldName, serializeFieldDefinition(next));
-                  }}
-                  className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
-                    parsed.validations['lt'] !== undefined ? 'bg-blue-600 text-white border-blue-600' : 'border-border'
-                  }`}
-                >
-                  &lt;
-                </button>
-                <input
-                  type="number"
-                  value={parsed.validations['lte'] || parsed.validations['lt'] || ''}
-                  onChange={(e) => {
-                    const key = parsed.validations['lte'] !== undefined ? 'lte' : 'lt';
-                    updateValidation(key, e.target.value || null);
-                  }}
-                  className={`flex-1 px-2 py-1 text-xs rounded border bg-transparent ${
-                    getRangeError(parsed.validations) ? 'border-red-500' : ''
-                  }`}
-                  style={{ borderColor: getRangeError(parsed.validations) ? undefined : 'hsl(var(--border))' }}
-                  placeholder="max"
-                />
-              </div>
-            </div>
-            {getRangeError(parsed.validations) && (
-              <p className="text-[10px] text-red-500 mt-1">{getRangeError(parsed.validations)}</p>
-            )}
-          </div>
+          <NumericBoundEditor
+            validations={localParsed.validations}
+            onValidationChange={updateValidation}
+          />
         )}
 
-        {/* Default value */}
         <div>
           <label className="text-xs text-muted-foreground">default</label>
-          {parsed.isArray ? (
-            <TagInput
-              tags={(() => {
-                const raw = parsed.validations['default'] || '';
-                if (!raw || raw === '[]') return [];
-                return raw.replace(/^\[|\]$/g, '').split(',').map(s => s.trim()).filter(Boolean);
-              })()}
-              onChange={(tags) => {
-                updateValidation('default', tags.length > 0 ? `[${tags.join(', ')}]` : null);
-              }}
-              placeholder="Add items..."
-            />
-          ) : isEnum && parsed.target && schema.enums?.[parsed.target] ? (
-            <select
-              value={parsed.validations['default'] || ''}
-              onChange={(e) => updateValidation('default', e.target.value || null)}
-              className="w-full px-2 py-1.5 text-xs rounded border bg-transparent"
-              style={{ borderColor: 'hsl(var(--border))' }}
-            >
-              <option value="">-- None --</option>
-              {schema.enums[parsed.target].map((val) => (
-                <option key={val} value={val}>{val}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              value={parsed.validations['default'] || ''}
-              onChange={(e) => updateValidation('default', e.target.value || null)}
-              className="w-full px-2 py-1 text-xs rounded border bg-transparent"
-              style={{ borderColor: 'hsl(var(--border))' }}
-              placeholder="default value"
-            />
-          )}
+          <DefaultValueEditor
+            parsed={localParsed}
+            enums={enums}
+            onValidationChange={updateValidation}
+          />
         </div>
 
-        {/* Regex (string only) */}
         {isString && (
-          <div>
-            <label className="text-xs text-muted-foreground">regex</label>
-            <input
-              type="text"
-              value={parsed.validations['regex'] || ''}
-              onChange={(e) => updateValidation('regex', e.target.value || null)}
-              className="w-full px-2 py-1 text-xs rounded border bg-transparent"
-              style={{ borderColor: 'hsl(var(--border))' }}
-              placeholder="^[A-Za-z]+$"
-            />
-          </div>
+          <Input
+            label="regex"
+            value={localParsed.validations['regex'] || ''}
+            onChange={(e) => updateValidation('regex', e.target.value || null)}
+            placeholder="^[A-Za-z]+$"
+          />
         )}
 
-        {/* on_delete (relation only) */}
         {isRelation && (
-          <div>
-            <label className="text-xs text-muted-foreground">on_delete</label>
-            <select
-              value={parsed.validations['on_delete'] || ''}
-              onChange={(e) => updateValidation('on_delete', e.target.value || null)}
-              className="w-full px-2 py-1.5 text-xs rounded border bg-transparent"
-              style={{ borderColor: 'hsl(var(--border))' }}
-            >
-              <option value="">None</option>
-              <option value="cascade">Cascade</option>
-              <option value="set_null">Set Null</option>
-              <option value="restrict">Restrict</option>
-              <option value="no_action">No Action</option>
-            </select>
-          </div>
+          <Select
+            label="on_delete"
+            value={localParsed.validations['on_delete'] || ''}
+            onChange={(e) => updateValidation('on_delete', e.target.value || null)}
+          >
+            <option value="">None</option>
+            {ON_DELETE_VALUES.map((val) => (
+              <option key={val} value={val}>{val}</option>
+            ))}
+          </Select>
         )}
       </div>
     </div>

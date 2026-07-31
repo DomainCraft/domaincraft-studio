@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { X, Plus } from 'lucide-react';
+import Button from '@/components/ui/Button';
 
 interface TagInputProps {
   tags: string[];
@@ -43,24 +44,24 @@ export default function TagInput({ tags, onChange, placeholder = 'Type and press
     <div className="space-y-1">
       <div
         className="flex flex-wrap gap-1 p-1.5 rounded border bg-transparent min-h-[32px] cursor-text"
-        style={{ borderColor: 'hsl(var(--border))' }}
         onClick={() => inputRef.current?.focus()}
       >
-        {tags.map((tag, i) => (
+        {tags.map((tag) => (
           <span
-            key={i}
+            key={tag}
             className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
           >
             {tag}
-            <button
+            <Button
+              variant="destructive"
+              className="p-0"
               onClick={(e) => {
                 e.stopPropagation();
-                removeTag(i);
+                onChange(tags.filter((t) => t !== tag));
               }}
-              className="hover:text-red-500 transition-colors"
             >
               <X size={10} />
-            </button>
+            </Button>
           </span>
         ))}
         <input
@@ -69,22 +70,22 @@ export default function TagInput({ tags, onChange, placeholder = 'Type and press
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={() => { if (input.trim()) addTag(input); }}
           placeholder={tags.length === 0 ? placeholder : ''}
           className="flex-1 min-w-[60px] px-1 py-0.5 text-xs bg-transparent outline-none"
         />
       </div>
       {input.trim() && (
-        <button
+        <Button
+          size="sm"
           onMouseDown={(e) => {
             e.preventDefault();
             handleAddClick();
           }}
-          className="flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-1"
         >
           <Plus size={10} />
           Add
-        </button>
+        </Button>
       )}
     </div>
   );

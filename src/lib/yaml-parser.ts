@@ -1,100 +1,147 @@
-import { parse, stringify } from 'yaml';
-import type { DomainSchema, EntityDefinition, ParsedField } from '@/types/domain';
+import { stringify } from 'yaml';
+import type { DomainSchema, EntityDefinition, ParsedField, AuthConfig } from '@/types/domain';
+import { DATABASES, API_STYLES, AUTH_TYPES } from '@/lib/constants';
+import {
+  wasmParseField,
+  wasmParseDomain,
+  isWasmReady,
+  type WasmParsedField,
+  type WasmRawSchema,
+} from './wasm-client';
+import { parseFieldDefinitionFallback, parseDomainYamlFallback } from './yaml-parser-fallback';
+
+export { parseFieldDefinitionFallback, parseDomainYamlFallback };
+
+const DATABASE_SET = new Set<string>(DATABASES);
+const API_STYLE_SET = new Set<string>(API_STYLES);
+const AUTH_TYPE_SET = new Set<string>(AUTH_TYPES);
+
+export function wasmFieldToParsed(wf: WasmParsedField, fallbackName: string): ParsedField {
+  const validations = { ...wf.Validations };
+  if (wf.IsPrimary) validations.primary = 'true';
+  if (wf.IsRequired) validations.required = 'true';
+  if (wf.IsUnique) validations.unique = 'true';
+  if (wf.IsHidden) validations.hidden = 'true';
+  if (wf.IsOptional) validations.optional = 'true';
+  if (wf.IsMany && wf.Type === 'relation') validations.many = 'true';
+  if (wf.OnDelete) {
+    validations.on_delete = wf.OnDelete;
+  }
+  if (wf.DefaultValue) {
+    validations.default = wf.DefaultIsFunc ? `${wf.DefaultValue}()` : wf.DefaultValue;
+  }
+  return {
+    name: wf.Name || fallbackName,
+    type: wf.Type === 'array' ? (wf.TargetType || 'string') : wf.Type,
+    target: wf.TargetEntity || wf.TargetType,
+    isArray: wf.Type === 'array' ? true : undefined,
+    validations,
+  };
+}
 
 export function parseFieldDefinition(nameOrDefinition: string, definition?: string): ParsedField {
   const name = definition !== undefined ? nameOrDefinition : '';
   const def = definition !== undefined ? definition : nameOrDefinition;
-  const result: ParsedField = { name, type: '', validations: {} };
-  const trimmed = def.trim();
-  const bracketMatch = trimmed.match(/\[([^\]]*)\]\s*$/);
-  if (bracketMatch) {
-    const parts = bracketMatch[1].split(',').map(p => p.trim());
-    for (const part of parts) {
-      const colonIdx = part.indexOf(':');
-      if (colonIdx > 0) {
-        result.validations[part.slice(0, colonIdx).trim()] = part.slice(colonIdx + 1).trim();
-      } else {
-        result.validations[part] = 'true';
-      }
-    }
+
+  if (isWasmReady()) {
+    const wf = wasmParseField(def, name);
+    if (wf) return wasmFieldToParsed(wf, name);
   }
-  const typePart = bracketMatch ? trimmed.slice(0, trimmed.indexOf('[')).trim() : trimmed;
-  const parenMatch = typePart.match(/^(\w+)\(([^)]+)\)$/);
-  if (parenMatch) {
-    const rawType = parenMatch[1];
-    result.target = parenMatch[2];
-    if (rawType === 'relation') {
-      result.type = 'relation';
-    } else if (rawType === 'enum') {
-      result.type = 'enum';
-      result.target = parenMatch[2];
-    } else if (rawType === 'array') {
-      result.type = parenMatch[2];
-      result.isArray = true;
-    }
-  } else {
-    result.type = typePart;
-  }
-  return result;
+
+  return parseFieldDefinitionFallback(name, def);
 }
 
-export function parseDomainYaml(yamlText: string): DomainSchema {
-  const raw = parse(yamlText);
-  if (!raw || typeof raw !== 'object') {
-    return { project: { name: 'Untitled' }, entities: {} };
+export type ParseDomainResult = { schema: DomainSchema; fieldOrder: Record<string, string[]> };
+
+export function parseDomainYaml(yamlText: string): ParseDomainResult {
+  if (isWasmReady()) {
+    const ws = wasmParseDomain(yamlText);
+    if (ws) return wasmSchemaToDomain(ws);
   }
-  const project = raw.project || { name: 'Untitled' };
+  const schema = parseDomainYamlFallback(yamlText);
+  return { schema, fieldOrder: {} };
+}
+
+function wasmSchemaToDomain(ws: WasmRawSchema): ParseDomainResult {
+  const auth: AuthConfig | undefined = ws.auth
+    ? {
+        type: AUTH_TYPE_SET.has(ws.auth.type as AuthConfig['type']) ? (ws.auth.type as AuthConfig['type']) : 'none',
+        entity: ws.auth.entity,
+        roles: ws.auth.roles,
+        endpoints: ws.auth.endpoints,
+      }
+    : undefined;
+
   const entities: Record<string, EntityDefinition> = {};
-  const enums: Record<string, string[]> = raw.enums || {};
-  if (raw.entities && typeof raw.entities === 'object') {
-    for (const [name, def] of Object.entries(raw.entities as Record<string, Record<string, unknown>>)) {
-      const entityDef = def as Record<string, unknown>;
-      const perms = entityDef.permissions as Record<string, unknown> | undefined;
-      entities[name] = {
-        fields: (entityDef.fields || {}) as Record<string, string>,
-        features: (entityDef.features || []) as EntityDefinition['features'],
-        permissions: perms ? {
-          read: perms.read as string[] | undefined,
-          create: perms.create as string[] | undefined,
-          update: perms.update as string[] | undefined,
-          delete: perms.delete as string[] | undefined,
-          read_public: perms.read_public as string | undefined,
-        } : undefined,
-        indexes: entityDef.indexes as EntityDefinition['indexes'],
-        seed: entityDef.seed as EntityDefinition['seed'],
-      };
-    }
+  const fieldOrder: Record<string, string[]> = {};
+  for (const [name, entity] of Object.entries(ws.entities)) {
+    entities[name] = {
+      fields: entity.fields,
+      features: entity.features as EntityDefinition['features'],
+      permissions: entity.permissions as EntityDefinition['permissions'],
+      indexes: entity.indexes as EntityDefinition['indexes'],
+      seed: entity.seed as EntityDefinition['seed'],
+    };
+    fieldOrder[name] = entity.fieldOrder && entity.fieldOrder.length > 0
+      ? entity.fieldOrder
+      : Object.keys(entity.fields);
   }
-  // Safeguard: auth might be an object in some YAML files, convert to string
-  let auth: string | undefined;
-  if (typeof raw.auth === 'string') {
-    auth = raw.auth;
-  } else if (raw.auth && typeof raw.auth === 'object') {
-    auth = (raw.auth as Record<string, unknown>).type as string || JSON.stringify(raw.auth);
+
+  let apiStyle: DomainSchema['api_style'] | undefined;
+  if (ws.apiStyle) {
+    if (API_STYLE_SET.has(ws.apiStyle)) {
+      apiStyle = ws.apiStyle as DomainSchema['api_style'];
+    } else {
+      console.warn(`[WASM contract] Unknown apiStyle value: "${ws.apiStyle}". Expected one of: ${API_STYLES.join(', ')}`);
+    }
   }
 
   return {
-    project,
-    database: raw.database as DomainSchema['database'],
-    auth,
-    api_style: raw.api_style as DomainSchema['api_style'],
-    entities,
-    enums,
+    schema: {
+      project: ws.project as DomainSchema['project'],
+      database: ws.database && DATABASE_SET.has(ws.database)
+        ? ws.database as DomainSchema['database']
+        : undefined,
+      auth,
+      api_style: apiStyle,
+      entities,
+      enums: ws.enums || {},
+    },
+    fieldOrder,
   };
 }
 
-export function serializeDomainYaml(schema: DomainSchema): string {
+export function serializeDomainYaml(schema: DomainSchema, fieldOrder?: Record<string, string[]>): string {
   const raw: Record<string, unknown> = { project: schema.project };
   if (schema.database) raw.database = schema.database;
-  if (schema.auth) raw.auth = schema.auth;
-  if (schema.api_style) raw.api_style = schema.api_style;
+  if (schema.auth) {
+    raw.auth = {
+      type: AUTH_TYPE_SET.has(schema.auth.type) ? schema.auth.type : 'none',
+      ...(schema.auth.entity && { entity: schema.auth.entity }),
+      ...(schema.auth.roles && schema.auth.roles.length > 0 && { roles: schema.auth.roles }),
+      ...(schema.auth.endpoints && { endpoints: schema.auth.endpoints }),
+    };
+  }
+  if (schema.api_style && API_STYLE_SET.has(schema.api_style)) raw.api_style = schema.api_style;
   if (schema.enums && Object.keys(schema.enums).length > 0) {
     raw.enums = schema.enums;
   }
   if (Object.keys(schema.entities).length > 0) {
     const entitiesOut: Record<string, Record<string, unknown>> = {};
     for (const [name, def] of Object.entries(schema.entities)) {
-      const entity: Record<string, unknown> = { fields: def.fields };
+      const order = fieldOrder?.[name];
+      const fields: Record<string, string> = {};
+      if (order) {
+        for (const key of order) {
+          if (key in def.fields && def.fields[key] !== undefined) fields[key] = def.fields[key]!;
+        }
+        for (const key of Object.keys(def.fields)) {
+          if (!(key in fields) && def.fields[key] !== undefined) fields[key] = def.fields[key]!;
+        }
+      } else {
+        for (const [k, v] of Object.entries(def.fields)) fields[k] = v;
+      }
+      const entity: Record<string, unknown> = { fields };
       if (def.features && def.features.length > 0) entity.features = def.features;
       if (def.permissions) entity.permissions = def.permissions;
       if (def.indexes && def.indexes.length > 0) entity.indexes = def.indexes;
@@ -106,6 +153,8 @@ export function serializeDomainYaml(schema: DomainSchema): string {
   return stringify(raw, { indent: 2 });
 }
 
+const FIELD_FLAG_MODIFIERS = new Set(['required', 'unique', 'hidden', 'primary', 'optional', 'many', 'email', 'url', 'ipv4']);
+
 export function serializeFieldDefinition(field: ParsedField): string {
   let typePart = field.type;
   if (field.type === 'relation' && field.target) {
@@ -115,27 +164,11 @@ export function serializeFieldDefinition(field: ParsedField): string {
   } else if (field.isArray && field.type !== 'relation') {
     typePart = `array(${field.type})`;
   }
-
   const validationEntries = Object.entries(field.validations);
   if (validationEntries.length === 0) return typePart;
-
   const parts = validationEntries.map(([key, value]) => {
-    if (value === 'true') return key;
+    if (FIELD_FLAG_MODIFIERS.has(key) && value === 'true') return key;
     return `${key}:${value}`;
   });
-
   return `${typePart} [${parts.join(', ')}]`;
-}
-
-export function findRelations(entities: Record<string, EntityDefinition>): Array<{ source: string; target: string; field: string }> {
-  const relations: Array<{ source: string; target: string; field: string }> = [];
-  for (const [entityName, entity] of Object.entries(entities)) {
-    for (const [fieldName, fieldDef] of Object.entries(entity.fields)) {
-      const parsed = parseFieldDefinition(fieldName, fieldDef);
-      if (parsed.type === 'relation' && parsed.target) {
-        relations.push({ source: entityName, target: parsed.target, field: fieldName });
-      }
-    }
-  }
-  return relations;
 }

@@ -1,37 +1,50 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
 import FieldEditor from './FieldEditor';
 import PermissionMatrix from '@/components/permissions/PermissionMatrix';
-import { Plus, Trash2, Shield, Trash2Icon, RefreshCw, FileText } from 'lucide-react';
-import type { EntityDefinition } from '@/types/domain';
-
-type FeatureId = NonNullable<EntityDefinition['features']>[number];
-
-const featureOptions: { id: FeatureId; label: string; icon: React.ComponentType<{ size?: number }>; color: string }[] = [
-  { id: 'audit', label: 'Audit', icon: Shield, color: 'bg-blue-500' },
-  { id: 'audit_log', label: 'Audit Log', icon: FileText, color: 'bg-purple-500' },
-  { id: 'soft_delete', label: 'Soft Delete', icon: Trash2Icon, color: 'bg-amber-500' },
-  { id: 'optimistic_lock', label: 'Optimistic Lock', icon: RefreshCw, color: 'bg-green-500' },
-];
+import SeedEditor from '@/components/seed/SeedEditor';
+import IndexEditor from '@/components/explorer/IndexEditor';
+import { Pencil } from 'lucide-react';
+import { featureOptions } from '@/lib/features';
+import { featureIcons } from '@/lib/feature-icons';
+import TabBar from '@/components/ui/TabBar';
+import AddItem from '@/components/ui/AddItem';
+import SelectableListItem from '@/components/ui/SelectableListItem';
+import Button from '@/components/ui/Button';
 
 const tabs = [
-  { id: 'fields' as const, label: 'Fields' },
-  { id: 'permissions' as const, label: 'Permissions' },
+  { id: 'fields', label: 'Fields' },
+  { id: 'indexes', label: 'Indexes' },
+  { id: 'seed', label: 'Seed' },
+  { id: 'permissions', label: 'Permissions' },
 ];
 
 export default function EntityInspector({ entityName }: { entityName: string }) {
-  const { schema, updateEntity, addField, removeField, selectedField, selectField } = useDomainStore();
-  const entity = schema.entities[entityName];
-  const [activeTab, setActiveTab] = useState<'fields' | 'permissions'>('fields');
-  const [newFieldName, setNewFieldName] = useState('');
-  const [showAddField, setShowAddField] = useState(false);
+  const entity = useDomainStore((s) => s.schema.entities[entityName]);
+  const updateEntity = useDomainStore((s) => s.updateEntity);
+  const renameEntity = useDomainStore((s) => s.renameEntity);
+  const addField = useDomainStore((s) => s.addField);
+  const removeField = useDomainStore((s) => s.removeField);
+  const selectedField = useDomainStore((s) => s.selectedField);
+  const selectField = useDomainStore((s) => s.selectField);
+
+  const [activeTab, setActiveTab] = useState('fields');
+  const [editingName, setEditingName] = useState(false);
+  const [renameValue, setRenameValue] = useState(entityName);
+
+  const hasConflict = useDomainStore(
+    useCallback(
+      (s) => renameValue !== entityName && renameValue in s.schema.entities,
+      [renameValue, entityName]
+    )
+  );
 
   if (!entity) return null;
 
   const features = entity.features || [];
   const fields = entity.fields || {};
 
-  const toggleFeature = (feature: FeatureId) => {
+  const toggleFeature = (feature: typeof featureOptions[number]['id']) => {
     const current = features || [];
     if (current.includes(feature)) {
       updateEntity(entityName, { features: current.filter((f) => f !== feature) });
@@ -40,33 +53,65 @@ export default function EntityInspector({ entityName }: { entityName: string }) 
     }
   };
 
-  const handleAddField = () => {
-    const name = newFieldName.trim();
-    if (!name || fields[name]) return;
+  const handleAddField = (name: string) => {
+    if (fields[name]) return;
     addField(entityName, name, 'string');
-    setNewFieldName('');
-    setShowAddField(false);
     selectField(name);
+  };
+
+  const handleRename = () => {
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== entityName && !hasConflict) {
+      renameEntity(entityName, trimmed);
+    }
+    setEditingName(false);
   };
 
   return (
     <div className="space-y-4 p-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 group">
         <div className="w-1.5 h-6 rounded-full bg-blue-500" />
-        <h3 className="text-sm font-bold">{entityName}</h3>
+        {editingName ? (
+          <input
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={handleRename}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingName(false); }}
+            className="text-sm font-bold bg-transparent border-b border-blue-500 outline-none"
+            autoFocus
+          />
+        ) : (
+          <h3
+            className="text-sm font-bold cursor-pointer hover:text-blue-400 transition-colors"
+            onClick={() => { setEditingName(true); setRenameValue(entityName); }}
+          >
+            {entityName}
+          </h3>
+        )}
+        {!editingName && (
+          <Button
+            variant="ghost"
+            className="p-0.5 opacity-0 group-hover:opacity-100"
+            onClick={() => { setEditingName(true); setRenameValue(entityName); }}
+          >
+            <Pencil size={10} />
+          </Button>
+        )}
       </div>
 
-      {/* Feature badges */}
       <div className="space-y-2">
         <span className="text-xs font-semibold uppercase text-muted-foreground">Features</span>
         <div className="flex flex-wrap gap-1.5">
-          {featureOptions.map(({ id, label, icon: Icon, color }) => {
+          {featureOptions.map(({ id, label, color }) => {
             const active = features.includes(id);
+            const Icon = featureIcons[id];
             return (
-              <button
+              <Button
                 key={id}
+                variant="ghost"
                 onClick={() => toggleFeature(id)}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2 py-1 font-medium ${
                   active
                     ? `${color} text-white`
                     : 'bg-muted text-muted-foreground hover:bg-accent'
@@ -74,93 +119,53 @@ export default function EntityInspector({ entityName }: { entityName: string }) 
               >
                 <Icon size={12} />
                 {label}
-              </button>
+              </Button>
             );
           })}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b" style={{ borderColor: 'hsl(var(--border))' }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'border-b-2 border-blue-500 text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'fields' && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-muted-foreground">Fields</span>
-            <button onClick={() => setShowAddField(!showAddField)} className="p-1 rounded hover:bg-accent">
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {showAddField && (
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={newFieldName}
-                onChange={(e) => setNewFieldName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddField()}
-                placeholder="Field name..."
-                className="flex-1 px-2 py-1 text-xs rounded border bg-transparent"
-                style={{ borderColor: 'hsl(var(--border))' }}
-                autoFocus
-              />
-              <button onClick={handleAddField} className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700">
-                Add
-              </button>
-            </div>
-          )}
+          <AddItem
+            label="Fields"
+            placeholder="Field name..."
+            onAdd={handleAddField}
+            validate={(name) => !fields[name]}
+          />
 
           <div className="space-y-0.5">
             {Object.entries(fields).map(([name, definition]) => (
-              <div
+              <SelectableListItem
                 key={name}
+                name={name}
+                subtitle={definition}
+                isSelected={selectedField === name}
                 onClick={() => selectField(name)}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs group transition-all duration-100 ${
-                  selectedField === name
-                    ? 'bg-blue-500/10 border-l-2 border-blue-500 pl-1.5'
-                    : 'border-l-2 border-transparent hover:bg-accent/50'
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className={`font-medium truncate ${selectedField === name ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-                    {name}
-                  </div>
-                  <div className="text-muted-foreground truncate">{definition}</div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeField(entityName, name);
-                    if (selectedField === name) selectField(null);
-                  }}
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
+                onDelete={() => {
+                  removeField(entityName, name);
+                  if (selectedField === name) selectField(null);
+                }}
+              />
             ))}
           </div>
 
           {selectedField && fields[selectedField] && (
-            <div className="mt-3 pt-3 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+            <div className="mt-3 pt-3 border-t border-themed">
               <FieldEditor entityName={entityName} fieldName={selectedField} />
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'indexes' && (
+        <IndexEditor entityName={entityName} />
+      )}
+
+      {activeTab === 'seed' && (
+        <SeedEditor entityName={entityName} />
       )}
 
       {activeTab === 'permissions' && (

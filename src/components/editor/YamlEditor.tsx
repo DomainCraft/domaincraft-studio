@@ -3,6 +3,16 @@ import { useDomainStore } from '@/stores/domain-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useCallback, useRef } from 'react';
 
+const editorOptions = {
+  minimap: { enabled: false },
+  fontSize: 13,
+  lineNumbers: 'on' as const,
+  scrollBeyondLastLine: false,
+  wordWrap: 'on' as const,
+  tabSize: 2,
+  automaticLayout: true,
+};
+
 export default function YamlEditor() {
   const yamlText = useDomainStore(s => s.yamlText);
   const setYamlText = useDomainStore(s => s.setYamlText);
@@ -26,15 +36,7 @@ export default function YamlEditor() {
         value={yamlText}
         onChange={handleChange}
         theme={darkMode ? 'vs-dark' : 'vs'}
-        options={{
-          minimap: { enabled: false },
-          fontSize: 13,
-          lineNumbers: 'on',
-          scrollBeyondLastLine: false,
-          wordWrap: 'on',
-          tabSize: 2,
-          automaticLayout: true,
-        }}
+        options={editorOptions}
       />
     </div>
   );

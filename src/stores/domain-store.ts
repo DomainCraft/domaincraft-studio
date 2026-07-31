@@ -1,84 +1,7 @@
 import { create } from 'zustand';
-import type { DomainSchema, EntityDefinition } from '@/types/domain';
+import type { DomainSchema } from '@/types/domain';
 import { parseDomainYaml, serializeDomainYaml } from '@/lib/yaml-parser';
-
-const sampleYaml = `project:
-  name: EcommercePlatform
-  description: Sample e-commerce API
-database: postgresql
-auth: jwt
-
-enums:
-  UserRole:
-    - Admin
-    - Editor
-    - Customer
-    - Guest
-  OrderStatus:
-    - Pending
-    - Paid
-    - Shipped
-    - Delivered
-    - Cancelled
-
-entities:
-  User:
-    fields:
-      id: uuid [primary]
-      email: string [required, unique, email]
-      password: string [required, hidden]
-      firstName: string [required, min:2, max:50]
-      lastName: string [required, min:2, max:50]
-      role: enum(UserRole) [default:Customer]
-      phoneNumbers: array(string)
-      isActive: boolean [default:true]
-    features:
-      - audit
-      - soft_delete
-    permissions:
-      read: ["*"]
-      create: ["*"]
-      update: ["@Owner", Admin]
-      delete: [Admin]
-
-  Product:
-    fields:
-      id: uuid [primary]
-      title: string [required, min:3, max:200]
-      description: text
-      price: decimal [required, gte:0]
-      sku: string [unique]
-      tags: array(string)
-      supplierId: relation(User)
-    features:
-      - audit
-      - soft_delete
-    permissions:
-      read: ["*"]
-      create: [Admin]
-      update: [Admin]
-      delete: [Admin]
-    seed:
-      - id: "550e8400-e29b-41d4-a716-446655440001"
-        title: "Widget"
-        price: "9.99"
-        sku: "WIDGET-001"
-
-  Order:
-    fields:
-      id: uuid [primary]
-      userId: relation(User) [required]
-      status: enum(OrderStatus) [default:Pending]
-      total: decimal [required, gte:0]
-    features:
-      - audit
-      - optimistic_lock
-    permissions:
-      read: [Admin, "@Owner"]
-      create: [User]
-      update: ["@Owner"]
-      delete: [Admin]
-`;
+import { createMutations } from './domain-mutations';
 
 interface DomainState {
   schema: DomainSchema;
@@ -86,6 +9,8 @@ interface DomainState {
   selectedField: string | null;
   yamlText: string;
   lastChangeSource: 'gui' | 'yaml' | null;
+  fieldOrder: Record<string, string[]>;
+  schemaVersion: number;
 
   setSchema: (schema: DomainSchema) => void;
   setYamlText: (text: string) => void;
@@ -95,7 +20,7 @@ interface DomainState {
   addEntity: (name: string) => void;
   removeEntity: (name: string) => void;
   renameEntity: (oldName: string, newName: string) => void;
-  updateEntity: (name: string, update: Partial<EntityDefinition>) => void;
+  updateEntity: (name: string, update: Partial<import('@/types/domain').EntityDefinition>) => void;
   selectEntity: (name: string | null) => void;
 
   addField: (entityName: string, fieldName: string, definition: string) => void;
@@ -109,7 +34,20 @@ interface DomainState {
 
   updateProject: (update: Partial<DomainSchema['project']>) => void;
   updateSchemaField: <K extends keyof DomainSchema>(key: K, value: DomainSchema[K]) => void;
+  updateAuth: (update: Partial<import('@/types/domain').AuthConfig>) => void;
 
+  addIndex: (entityName: string, index: import('@/types/domain').IndexDefinition) => void;
+  removeIndex: (entityName: string, indexIdx: number) => void;
+  updateIndex: (entityName: string, indexIdx: number, index: import('@/types/domain').IndexDefinition) => void;
+
+  addSeedEntry: (entityName: string, entry: Record<string, unknown>) => void;
+  removeSeedEntry: (entityName: string, entryIdx: number) => void;
+  updateSeedEntry: (entityName: string, entryIdx: number, entry: Record<string, unknown>) => void;
+
+  addRoleToEntity: (entityName: string, role: string) => void;
+  removeRole: (role: string) => void;
+
+  getAllRoles: () => string[];
   loadSample: () => void;
 }
 
@@ -118,195 +56,102 @@ const defaultSchema: DomainSchema = {
   entities: {},
 };
 
-export const useDomainStore = create<DomainState>((set, get) => ({
-  schema: defaultSchema,
-  selectedEntity: null,
-  selectedField: null,
-  yamlText: serializeDomainYaml(defaultSchema),
-  lastChangeSource: null,
+export const useDomainStore = create<DomainState>((set, get) => {
+  const mutations = createMutations(
+    get as () => DomainState,
+    set as (p: Partial<DomainState>) => void,
+  );
 
-  setSchema: (schema) => {
-    set({ schema, lastChangeSource: 'gui' });
-    set({ yamlText: serializeDomainYaml(schema), lastChangeSource: null });
-  },
+  return {
+    schema: defaultSchema,
+    selectedEntity: null,
+    selectedField: null,
+    yamlText: serializeDomainYaml(defaultSchema),
+    lastChangeSource: null,
+    fieldOrder: {},
+    schemaVersion: 0,
 
-  setYamlText: (text) => set({ yamlText: text }),
+    setSchema: (schema) => {
+      set({ schema, yamlText: serializeDomainYaml(schema, get().fieldOrder), lastChangeSource: 'gui', schemaVersion: get().schemaVersion + 1 });
+    },
 
-  syncFromYaml: () => {
-    const { yamlText } = get();
-    try {
-      const schema = parseDomainYaml(yamlText);
-      set({ schema, lastChangeSource: 'yaml' });
-    } catch (e) {
-      console.error('Failed to parse YAML:', e);
-    }
-  },
+    setYamlText: (text) => set({ yamlText: text }),
 
-  syncToYaml: () => {
-    const { schema } = get();
-    set({ yamlText: serializeDomainYaml(schema), lastChangeSource: 'gui' });
-  },
+    syncFromYaml: () => {
+      const { yamlText } = get();
+      try {
+        const result = parseDomainYaml(yamlText);
+        set({ schema: result.schema, lastChangeSource: 'yaml', fieldOrder: result.fieldOrder, schemaVersion: get().schemaVersion + 1 });
+      } catch (e) {
+        console.error('Failed to parse YAML:', e);
+      }
+    },
 
-  addEntity: (name) => {
-    const { schema } = get();
-    const newSchema = {
-      ...schema,
-      entities: {
-        ...schema.entities,
-        [name]: { fields: { id: 'uuid [primary]' } },
-      },
-    };
-    set({ schema: newSchema, selectedEntity: name, selectedField: null });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    syncToYaml: () => {
+      const { schema, fieldOrder } = get();
+      set({ yamlText: serializeDomainYaml(schema, fieldOrder), lastChangeSource: 'gui' });
+    },
 
-  removeEntity: (name) => {
-    const { schema, selectedEntity } = get();
-    const rest = { ...schema.entities };
-    delete rest[name];
-    const newSchema = { ...schema, entities: rest };
-    set({
-      schema: newSchema,
-      selectedEntity: selectedEntity === name ? null : selectedEntity,
-    });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    selectEntity: (name) => set({ selectedEntity: name, selectedField: null }),
+    selectField: (fieldName) => set({ selectedField: fieldName }),
 
-  renameEntity: (oldName, newName) => {
-    const { schema, selectedEntity } = get();
-    if (oldName === newName || schema.entities[newName]) return;
-    const entity = schema.entities[oldName];
-    const rest = { ...schema.entities };
-    delete rest[oldName];
-    const newSchema = { ...schema, entities: { ...rest, [newName]: entity } };
-    set({
-      schema: newSchema,
-      selectedEntity: selectedEntity === oldName ? newName : selectedEntity,
-    });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    addEntity: (name) => {
+      mutations.addEntity(name);
+      set({ selectedEntity: name, selectedField: null });
+    },
 
-  updateEntity: (name, update) => {
-    const { schema } = get();
-    const entity = schema.entities[name];
-    if (!entity) return;
-    const newSchema = {
-      ...schema,
-      entities: { ...schema.entities, [name]: { ...entity, ...update } },
-    };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    removeEntity: (name) => {
+      mutations.removeEntity(name);
+    },
 
-  selectEntity: (name) => set({ selectedEntity: name, selectedField: null }),
+    renameEntity: mutations.renameEntity,
+    updateEntity: mutations.updateEntity,
+    addField: mutations.addField,
 
-  addField: (entityName, fieldName, definition) => {
-    const { schema } = get();
-    const entity = schema.entities[entityName];
-    if (!entity || entity.fields[fieldName]) return;
-    const newSchema = {
-      ...schema,
-      entities: {
-        ...schema.entities,
-        [entityName]: {
-          ...entity,
-          fields: { ...entity.fields, [fieldName]: definition },
-        },
-      },
-    };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    removeField: (entityName, fieldName) => {
+      mutations.removeField(entityName, fieldName);
+    },
 
-  removeField: (entityName, fieldName) => {
-    const { schema, selectedField } = get();
-    const entity = schema.entities[entityName];
-    if (!entity) return;
-    const rest = { ...entity.fields };
-    delete rest[fieldName];
-    const newSchema = {
-      ...schema,
-      entities: {
-        ...schema.entities,
-        [entityName]: { ...entity, fields: rest },
-      },
-    };
-    set({
-      schema: newSchema,
-      selectedField: selectedField === fieldName ? null : selectedField,
-    });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    updateField: mutations.updateField,
+    addEnum: mutations.addEnum,
+    removeEnum: mutations.removeEnum,
+    updateEnum: mutations.updateEnum,
+    updateProject: mutations.updateProject,
+    updateSchemaField: mutations.updateSchemaField,
+    updateAuth: mutations.updateAuth,
+    addIndex: mutations.addIndex,
+    removeIndex: mutations.removeIndex,
+    updateIndex: mutations.updateIndex,
+    addSeedEntry: mutations.addSeedEntry,
+    removeSeedEntry: mutations.removeSeedEntry,
+    updateSeedEntry: mutations.updateSeedEntry,
 
-  updateField: (entityName, fieldName, definition) => {
-    const { schema } = get();
-    const entity = schema.entities[entityName];
-    if (!entity) return;
-    const newSchema = {
-      ...schema,
-      entities: {
-        ...schema.entities,
-        [entityName]: {
-          ...entity,
-          fields: { ...entity.fields, [fieldName]: definition },
-        },
-      },
-    };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
+    addRoleToEntity: mutations.addRoleToEntity,
+    removeRole: mutations.removeRole,
 
-  selectField: (fieldName) => set({ selectedField: fieldName }),
+    getAllRoles: () => {
+      const { schema } = get();
+      const roles = new Set<string>();
+      const crudOps = ['read', 'create', 'update', 'delete'] as const;
+      for (const ent of Object.values(schema.entities)) {
+        for (const op of crudOps) {
+          for (const role of (ent.permissions?.[op] || [])) {
+            roles.add(role);
+          }
+        }
+      }
+      return Array.from(roles).sort();
+    },
 
-  addEnum: (name, values) => {
-    const { schema } = get();
-    const newSchema = {
-      ...schema,
-      enums: { ...(schema.enums || {}), [name]: values },
-    };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
-
-  removeEnum: (name) => {
-    const { schema } = get();
-    const rest = { ...(schema.enums || {}) };
-    delete rest[name];
-    const newSchema = { ...schema, enums: rest };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
-
-  updateEnum: (name, values) => {
-    const { schema } = get();
-    const newSchema = {
-      ...schema,
-      enums: { ...(schema.enums || {}), [name]: values },
-    };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
-
-  updateProject: (update) => {
-    const { schema } = get();
-    const newSchema = { ...schema, project: { ...schema.project, ...update } };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
-
-  updateSchemaField: (key, value) => {
-    const { schema } = get();
-    const newSchema = { ...schema, [key]: value };
-    set({ schema: newSchema });
-    set({ yamlText: serializeDomainYaml(newSchema) });
-  },
-
-  loadSample: () => {
-    try {
-      const schema = parseDomainYaml(sampleYaml);
-      set({ schema, yamlText: sampleYaml, selectedEntity: null, selectedField: null });
-    } catch (e) {
-      console.error('Failed to load sample:', e);
-    }
-  },
-}));
+    loadSample: () => {
+      import('@/lib/sample-data').then(({ sampleYaml }) => {
+        try {
+          const result = parseDomainYaml(sampleYaml);
+          set({ schema: result.schema, yamlText: serializeDomainYaml(result.schema, result.fieldOrder), selectedEntity: null, selectedField: null, fieldOrder: result.fieldOrder, schemaVersion: get().schemaVersion + 1 });
+        } catch (e) {
+          console.error('Failed to load sample:', e);
+        }
+      });
+    },
+  };
+});

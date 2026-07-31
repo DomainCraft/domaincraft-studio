@@ -1,54 +1,30 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Key, Link, Lock, Hash, Type, ToggleLeft, Calendar, FileText, List, Shield, Trash2, RefreshCw } from 'lucide-react';
+import { Key, Lock } from 'lucide-react';
 import type { ParsedField } from '@/types/domain';
-
-const featureIcons: Record<string, { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; color: string }> = {
-  audit: { icon: Shield, label: 'Audit', color: 'bg-blue-500' },
-  audit_log: { icon: FileText, label: 'Audit Log', color: 'bg-purple-500' },
-  soft_delete: { icon: Trash2, label: 'Soft Delete', color: 'bg-amber-500' },
-  optimistic_lock: { icon: RefreshCw, label: 'Optimistic Lock', color: 'bg-green-500' },
-};
-
-function getTypeIcon(type: string) {
-  switch (type) {
-    case 'uuid': return Key;
-    case 'relation': return Link;
-    case 'string':
-    case 'text': return Type;
-    case 'int':
-    case 'bigint':
-    case 'float':
-    case 'decimal': return Hash;
-    case 'boolean': return ToggleLeft;
-    case 'date':
-    case 'datetime': return Calendar;
-    case 'json':
-    case 'jsonb': return FileText;
-    case 'enum': return List;
-    default: return Type;
-  }
-}
-
-function formatFieldType(field: ParsedField): string {
-  if (field.type === 'relation') return `→ ${field.target}`;
-  if (field.type === 'enum') return field.target || 'enum';
-  const base = field.type;
-  return field.isArray ? `${base}[]` : base;
-}
+import { featureConfig, type FeatureId } from '@/lib/features';
+import { featureIcons } from '@/lib/feature-icons';
+import { getTypeIcon, formatFieldType } from '@/lib/type-icons';
 
 interface EntityNodeData {
   name: string;
   fields: ParsedField[];
   features: string[];
-  selectedEntity?: string | null;
-  [key: string]: unknown;
 }
 
-function EntityNode({ data, selected }: NodeProps & { data: EntityNodeData }) {
-  const { name, fields = [], features = [], selectedEntity } = data;
-  const activeFeatures = features.filter(f => featureIcons[f]);
-  const isSelected = selected || selectedEntity === name;
+function isEntityNodeData(data: Record<string, unknown>): data is EntityNodeData & Record<string, unknown> {
+  return typeof data.name === 'string'
+    && Array.isArray(data.fields)
+    && Array.isArray(data.features);
+}
+
+function EntityNode({ data, selected }: NodeProps) {
+  const nodeData = data as Record<string, unknown>;
+  if (!isEntityNodeData(nodeData)) return null;
+
+  const { name, fields = [], features = [] } = nodeData;
+  const activeFeatures = features.filter((f): f is FeatureId => f in featureConfig);
+  const isSelected = selected;
 
   return (
     <div
@@ -66,8 +42,8 @@ function EntityNode({ data, selected }: NodeProps & { data: EntityNodeData }) {
         <span className="font-bold text-foreground text-sm truncate">{name}</span>
         <div className="flex gap-1 ml-auto">
           {activeFeatures.map(feat => {
-            const config = featureIcons[feat];
-            const Icon = config.icon;
+            const config = featureConfig[feat];
+            const Icon = featureIcons[feat];
             return (
               <span
                 key={feat}
@@ -86,7 +62,6 @@ function EntityNode({ data, selected }: NodeProps & { data: EntityNodeData }) {
           const TypeIcon = getTypeIcon(field.type);
           const isPrimary = field.validations?.primary === 'true';
           const isHidden = field.validations?.hidden === 'true';
-          const isRelation = field.type === 'relation';
 
           return (
             <div
@@ -110,7 +85,7 @@ function EntityNode({ data, selected }: NodeProps & { data: EntityNodeData }) {
               )}
 
               <span className={`ml-auto truncate text-[10px] ${
-                isRelation ? 'text-blue-500' : 'text-muted-foreground'
+                field.type === 'relation' ? 'text-blue-500' : 'text-muted-foreground'
               }`}>
                 {formatFieldType(field)}
               </span>

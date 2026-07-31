@@ -1,38 +1,32 @@
 import { create } from 'zustand';
 import type { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react';
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
-import type { EntityDefinition } from '@/types/domain';
-import { parseFieldDefinition } from '@/lib/yaml-parser';
+import type { EntityDefinition, ParsedField } from '@/types/domain';
 import { getLayoutedElements } from '@/lib/layout';
+import { buildCanvasElements, entitiesDiffer } from '@/lib/canvas-helpers';
+
+export type ParsedFieldData = ParsedField;
 
 interface CanvasState {
   nodes: Node[];
   edges: Edge[];
+  lastSyncedEntities: Record<string, EntityDefinition>;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
-  syncFromSchema: (entities: Record<string, EntityDefinition>) => void;
+  setSelectedNode: (nodeId: string | null) => void;
+  syncFromSchema: (
+    entities: Record<string, EntityDefinition>,
+    parseField: (name: string, def: string) => ParsedFieldData
+  ) => void;
   autoLayout: (direction?: 'TB' | 'LR') => void;
-}
-
-function calculateLayout(entityNames: string[]): Record<string, { x: number; y: number }> {
-  const positions: Record<string, { x: number; y: number }> = {};
-  const cols = Math.max(1, Math.ceil(Math.sqrt(entityNames.length)));
-  const spacing = { x: 320, y: 280 };
-
-  entityNames.forEach((name, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    positions[name] = { x: col * spacing.x + 50, y: row * spacing.y + 50 };
-  });
-
-  return positions;
 }
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   edges: [],
+  lastSyncedEntities: {},
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -45,60 +39,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ edges: applyEdgeChanges(changes, get().edges) });
   },
 
-  syncFromSchema: (entities) => {
+  setSelectedNode: (nodeId) => {
+    const { nodes } = get();
+    const needsUpdate = nodes.some((n) => (n.selected ?? false) !== (n.id === nodeId));
+    if (!needsUpdate) return;
+    const changes = nodes.map((node) => ({
+      id: node.id,
+      type: 'select' as const,
+      selected: node.id === nodeId,
+    }));
+    set({ nodes: applyNodeChanges(changes, nodes) });
+  },
+
+  syncFromSchema: (entities, parseField) => {
+    if (!entitiesDiffer(entities, get().lastSyncedEntities)) return;
+
     const { nodes: existingNodes } = get();
     const existingPositions: Record<string, { x: number; y: number }> = {};
     existingNodes.forEach((node) => {
       existingPositions[node.id] = node.position;
     });
 
-    const entityNames = Object.keys(entities);
-    const layoutPositions = calculateLayout(entityNames);
-
-    const nodes: Node[] = entityNames.map((name) => {
-      const entity = entities[name];
-      const fields = Object.entries(entity.fields).map(([fieldName, fieldDef]) => {
-        const parsed = parseFieldDefinition(fieldName, fieldDef);
-        return parsed;
-      });
-
-      const position = existingPositions[name] || layoutPositions[name] || { x: 0, y: 0 };
-
-      return {
-        id: name,
-        type: 'entity',
-        position,
-        data: {
-          name,
-          fields,
-          features: entity.features || [],
-          permissions: entity.permissions,
-        },
-      };
-    });
-
-    const edges: Edge[] = [];
-    entityNames.forEach((name) => {
-      const entity = entities[name];
-      Object.entries(entity.fields).forEach(([fieldName, fieldDef]) => {
-        const parsed = parseFieldDefinition(fieldName, fieldDef);
-        if (parsed.type === 'relation' && parsed.target && entities[parsed.target]) {
-          edges.push({
-            id: `${name}-${fieldName}-${parsed.target}`,
-            source: name,
-            target: parsed.target,
-            type: 'crowFoot',
-            animated: false,
-            data: {
-              sourceCardinality: parsed.validations?.unique === 'true' ? 'one' : 'many',
-              targetCardinality: parsed.isArray || parsed.validations?.many === 'true' ? 'many' : 'one',
-            },
-          });
-        }
-      });
-    });
-
-    set({ nodes, edges });
+    const { nodes, edges } = buildCanvasElements(entities, parseField, existingPositions);
+    set({ nodes, edges, lastSyncedEntities: entities });
   },
 
   autoLayout: (direction = 'TB') => {
