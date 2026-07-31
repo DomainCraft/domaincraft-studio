@@ -15,6 +15,8 @@ declare global {
   }
 }
 
+const wasmBaseUrl = `${import.meta.env.BASE_URL}wasm/`;
+
 export async function loadWasmValidator(): Promise<boolean> {
   if (wasmReady) return true;
   if (wasmLoading || wasmLoadError) return false;
@@ -24,7 +26,7 @@ export async function loadWasmValidator(): Promise<boolean> {
     if (!window.Go) {
       await new Promise<void>((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/wasm/wasm_exec.js';
+        script.src = `${wasmBaseUrl}wasm_exec.js`;
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('Failed to load wasm_exec.js'));
         document.head.appendChild(script);
@@ -33,7 +35,7 @@ export async function loadWasmValidator(): Promise<boolean> {
 
     const go = new window.Go();
     const result = await WebAssembly.instantiateStreaming(
-      fetch('/wasm/validate.wasm.gz').catch(() => fetch('/wasm/validate.wasm')),
+      fetch(`${wasmBaseUrl}validate.wasm.gz`).catch(() => fetch(`${wasmBaseUrl}validate.wasm`)),
       go.importObject,
     );
     go.run(result.instance);
