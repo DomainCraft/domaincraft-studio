@@ -12,6 +12,7 @@ declare global {
     goValidate?: (yamlText: string) => string;
     goParseField?: (fieldDef: string, fieldName?: string) => string;
     goParseDomain?: (yamlText: string) => string;
+    goVersion?: () => string;
   }
 }
 
@@ -35,7 +36,7 @@ export async function loadWasmValidator(): Promise<boolean> {
 
     const go = new window.Go();
     const result = await WebAssembly.instantiateStreaming(
-      fetch(`${wasmBaseUrl}validate.wasm.gz`).catch(() => fetch(`${wasmBaseUrl}validate.wasm`)),
+      fetch(`${wasmBaseUrl}validate.wasm`),
       go.importObject,
     );
     go.run(result.instance);
@@ -54,6 +55,10 @@ export async function loadWasmValidator(): Promise<boolean> {
 
 export function isWasmReady(): boolean {
   return wasmReady;
+}
+
+export function getWasmVersion(): string | null {
+  return typeof window.goVersion === 'function' ? window.goVersion() : null;
 }
 
 export function onWasmReady(callback: () => void): () => void {

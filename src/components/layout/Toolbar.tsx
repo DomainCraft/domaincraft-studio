@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { useDomainStore } from '@/stores/domain-store';
 import { useCanvasStore } from '@/stores/canvas-store';
@@ -16,6 +17,7 @@ import {
   AlignVerticalSpaceAround,
 } from 'lucide-react';
 import { exportYaml, importYaml } from '@/lib/file-io';
+import { getWasmVersion, isWasmReady, onWasmReady } from '@/lib/wasm-loader';
 import Button from '@/components/ui/Button';
 
 const viewModes = [
@@ -36,6 +38,14 @@ export default function Toolbar() {
   const syncFromYaml = useDomainStore((s) => s.syncFromYaml);
   const autoLayout = useCanvasStore((s) => s.autoLayout);
   const { fitView } = useReactFlow();
+  const [wasmVersion, setWasmVersion] = useState<string | null>(() =>
+    isWasmReady() ? getWasmVersion() : null,
+  );
+
+  useEffect(() => {
+    if (wasmVersion) return;
+    return onWasmReady(() => setWasmVersion(getWasmVersion()));
+  }, [wasmVersion]);
 
   const handleAutoLayout = () => {
     autoLayout('TB');
@@ -87,6 +97,15 @@ export default function Toolbar() {
       )}
 
       <div className="flex-1" />
+
+      {wasmVersion && (
+        <span
+          title="Core validator version"
+          className="text-xs text-muted-foreground font-mono px-2 select-none"
+        >
+          v{wasmVersion}
+        </span>
+      )}
 
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" onClick={handleImport} title="Import domain.yaml">

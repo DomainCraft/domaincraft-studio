@@ -109,7 +109,7 @@ The GUI uses Go WASM for **both parsing and validation**:
 - **Validation**: `wasmValidate()` delegates to Go core's Validator
 - **Fallback**: TypeScript implementations run when WASM is unavailable
 
-The WASM binary is loaded from `/wasm/validate.wasm.gz` (with fallback to `/wasm/validate.wasm`).
+The WASM binary is loaded from `/wasm/validate.wasm`. The core version is baked into the binary via `-X main.version` (from the nearest git tag) and exposed as `goVersion()`, displayed in the toolbar.
 
 ### WASM/fallback parity
 
