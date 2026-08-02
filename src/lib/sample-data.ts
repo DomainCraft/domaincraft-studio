@@ -1,84 +1,271 @@
 export const sampleYaml = `project:
-  name: EcommercePlatform
-  description: Sample e-commerce API
+  name: ECommerce Platform
+  description: Modern e-commerce system with advanced features
+  version: 1.0.0
+  deploy:
+    domain: localhost
+    port: 8088
+  multi_tenancy:
+    enabled: true
+    mode: column
+
 database: postgresql
 auth:
   type: jwt
   entity: User
-  roles: [Admin, Editor, Customer]
+  roles: [Admin, Editor, Customer, Vendor, User]
   endpoints:
     login: true
     register: true
     me: true
+api_style: rest
 
 enums:
+  OrderStatus:
+    - PENDING
+    - PROCESSING
+    - SHIPPED
+    - DELIVERED
+    - CANCELLED
+
+  ProductStatus:
+    - DRAFT
+    - PUBLISHED
+    - ARCHIVED
   UserRole:
     - Admin
     - Editor
     - Customer
     - Guest
-  OrderStatus:
-    - Pending
-    - Paid
-    - Shipped
-    - Delivered
-    - Cancelled
+
+  DocStatus:
+    - Draft
+    - Review
+    - Published
+    - Archived
+
+  PaymentMethod:
+    - CreditCard
+    - DebitCard
+    - PayPal
+    - BankTransfer
+    - Crypto
 
 entities:
   User:
+    features: [audit, soft_delete]
     fields:
       id: uuid [primary]
       email: string [required, unique, email]
       password: string [required, hidden]
       firstName: string [required, min:2, max:50]
       lastName: string [required, min:2, max:50]
-      role: enum(UserRole) [default:Customer]
+      avatar: string [optional, url]
       phoneNumbers: array(string)
       isActive: boolean [default:true]
-    features:
-      - audit
-      - soft_delete
+      role: enum(UserRole) [default:Customer]
+      lastLoginAt: datetime [optional]
+      dateOfBirth: date [optional]
+      loginCount: bigint [default:0]
+      rating: float [optional]
+      bio: text [optional]
+      tags: array(uuid) [optional]
+      favoriteDates: array(date) [optional]
+      metadata: jsonb [optional]
+
     permissions:
-      read: ["*"]
+      read: [Admin, "*"]
       create: ["*"]
       update: ["@Owner", Admin]
       delete: [Admin]
 
+    seed:
+      - { id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", email: "admin@example.com", password: "hashed_password", firstName: "Admin", lastName: "User", role: "Admin", isActive: true }
+
   Product:
+    features: [audit, soft_delete, optimistic_lock]
     fields:
       id: uuid [primary]
-      title: string [required, min:3, max:200]
-      description: text
+      title: string [required, min:5, max:200]
+      description: text [optional]
       price: decimal [required, gte:0]
-      sku: string [unique]
-      tags: array(string)
-      supplierId: relation(User)
-    features:
-      - audit
-      - soft_delete
+      stock: int [required, default:0]
+      weight: float [optional, gte:0]
+      status: enum(ProductStatus) [default:DRAFT]
+      categoryId: relation(Category) [optional, on_delete:set_null]
+      supplierId: relation(User) [required, on_delete:restrict]
+      tags: relation(Tag) [many]
+      images: array(string)
+      metadata: json [optional]
+      availableSince: datetime [optional]
+      viewCount: bigint [default:0]
+      relatedProductIds: array(uuid) [optional]
+      supportedPaymentMethods: array(PaymentMethod) [optional]
+
+    indexes:
+      - fields: [status, categoryId]
+        type: btree
+      - fields: [title]
+        type: btree
+
     permissions:
       read: ["*"]
       create: [Admin]
       update: [Admin]
       delete: [Admin]
-    seed:
-      - id: "550e8400-e29b-41d4-a716-446655440001"
-        title: "Widget"
-        price: "9.99"
-        sku: "WIDGET-001"
 
-  Order:
+    seed:
+      - { id: "550e8400-e29b-41d4-a716-446655440000", title: "Sample Product", price: "9999", stock: 100, status: "DRAFT", supplierId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" }
+
+  Category:
+    features: [audit]
     fields:
       id: uuid [primary]
-      userId: relation(User) [required]
-      status: enum(OrderStatus) [default:Pending]
-      total: decimal [required, gte:0]
-    features:
-      - audit
-      - optimistic_lock
+      name: string [required, unique, min:3, max:100]
+      description: string [optional, max:500]
+      parentId: relation(Category) [optional, on_delete:set_null]
+      slug: string [required, unique, regex:"^[a-z0-9-]+$"]
+      isActive: boolean [default:true]
+      sortOrder: int [default:0]
+
+    permissions:
+      read: ["*"]
+      create: [Admin]
+      update: [Admin]
+      delete: [Admin]
+
+  Order:
+    features: [audit_log, soft_delete]
+    fields:
+      id: uuid [primary]
+      orderNumber: string [required, unique]
+      userId: relation(User) [required, on_delete:restrict]
+      status: enum(OrderStatus) [default:PENDING]
+      totalAmount: decimal [required, gte:0]
+      notes: string [optional, max:1000]
+      shippingAddress: json [optional]
+      items: relation(OrderItem) [many]
+      paidAt: datetime [optional]
+      subtotal: decimal [required, gte:0]
+      tax: decimal [optional, gte:0]
+      trackingNumbers: array(string) [optional]
+      estimatedDeliveryDates: array(datetime) [optional]
+
     permissions:
       read: [Admin, "@Owner"]
       create: [User]
       update: ["@Owner"]
       delete: [Admin]
+
+  OrderItem:
+    features: [audit]
+    fields:
+      id: uuid [primary]
+      orderId: relation(Order) [required, on_delete:cascade]
+      productId: relation(Product) [required, on_delete:restrict]
+      quantity: int [required, gte:1]
+      unitPrice: decimal [required, gte:0]
+      discount: decimal [optional, default:0, gte:0, lt:100]
+
+    permissions:
+      read: [Admin, "@Owner"]
+      create: [User]
+      update: [Admin]
+      delete: [Admin]
+
+  Tag:
+    features: [audit]
+    fields:
+      id: uuid [primary]
+      name: string [required, unique, min:2, max:50]
+      slug: string [required, unique, regex:"^[a-z0-9-]+$"]
+      description: string [optional, max:200]
+      usageCount: bigint [default:0]
+
+    permissions:
+      read: ["*"]
+      create: [Admin]
+      update: [Admin]
+      delete: [Admin]
+
+  Review:
+    features: [audit_log, soft_delete]
+    fields:
+      id: uuid [primary]
+      productId: relation(Product) [required, on_delete:cascade]
+      userId: relation(User) [required, on_delete:cascade]
+      rating: int [required, gte:1, lt:6]
+      title: string [required, min:5, max:100]
+      content: text [optional]
+      isVerifiedPurchase: boolean [default:false]
+      helpful: int [default:0]
+
+    indexes:
+      - fields: [productId, rating]
+      - fields: [userId, createdBy]
+
+    permissions:
+      read: ["*"]
+      create: [User]
+      update: ["@Owner", Admin]
+      delete: [Admin, "@Owner"]
+
+  Document:
+    features: [audit_log, soft_delete, optimistic_lock]
+    fields:
+      id: uuid [primary]
+      title: string [required, min:5, max:255]
+      content: text
+      status: enum(DocStatus) [default:Draft]
+      folderId: relation(Folder) [optional, on_delete:set_null]
+      authorId: relation(User) [required, on_delete:restrict]
+      isPublished: boolean [default:false]
+      internalNotes: string [hidden, optional]
+      publishedAt: datetime [optional]
+      fileSize: bigint [default:0]
+      checksum: string [optional, max:64]
+
+    permissions:
+      read: [Admin, "@Owner"]
+      create: [User, Admin]
+      update: ["@Owner", Admin]
+      delete: [Admin]
+
+  Folder:
+    features: [audit]
+    fields:
+      id: uuid [primary]
+      name: string [required, min:2, max:200]
+      parentId: relation(Folder) [optional, on_delete:set_null]
+      slug: string [required, unique, regex:"^[a-z0-9-]+$"]
+      isActive: boolean [default:true]
+      ownerId: relation(User) [optional, on_delete:restrict]
+      sortOrder: int [default:0]
+
+    permissions:
+      read: [Admin, "*"]
+      create: [Admin]
+      update: [Admin]
+      delete: [Admin]
+
+  Payment:
+    features: [audit]
+    fields:
+      id: uuid [primary]
+      orderId: relation(Order) [required, on_delete:restrict]
+      amount: decimal [required, gt:0]
+      method: enum(PaymentMethod) [required]
+      status: string [required, default:"pending"]
+      transactionId: string [optional, unique, max:255]
+      paidAt: datetime [optional]
+      refundAmount: decimal [optional, gte:0]
+      metadata: jsonb [optional]
+      attemptCount: int [default:1]
+
+    permissions:
+      read: [Admin, "@Owner"]
+      create: [Admin]
+      update: [Admin]
+      delete: [Admin]
+
 `;
