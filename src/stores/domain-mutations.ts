@@ -77,7 +77,9 @@ export function createMutations(get: SchemaGetter, set: SchemaSetter) {
         if (!entity) return s;
         const rest = { ...s.entities };
         delete rest[oldName];
-        return { ...s, entities: { ...rest, [newName]: entity } };
+        // Record old_name so the CLI migration engine detects the rename
+        // and can offer to rename orphaned custom files.
+        return { ...s, entities: { ...rest, [newName]: { ...entity, old_name: oldName } } };
       });
       const order = getFieldOrder(oldName);
       if (order) {

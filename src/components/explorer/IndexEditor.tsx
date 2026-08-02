@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
 import { Plus, Trash2, X } from 'lucide-react';
-import { INDEX_TYPES } from '@/lib/constants';
+import { INDEX_TYPES, SORT_DIRECTIONS } from '@/lib/constants';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
 import Button from '@/components/ui/Button';
@@ -23,7 +23,8 @@ export default function IndexEditor({ entityName }: Props) {
 
   const handleAdd = () => {
     if (newIndex.fields.length === 0) return;
-    addIndex(entityName, { ...newIndex });
+    const sort = newIndex.fields.map((_f, i) => newIndex.sort?.[i] || 'asc');
+    addIndex(entityName, { ...newIndex, sort });
     setNewIndex({ fields: [], type: 'btree' });
     setAdding(false);
   };
@@ -34,6 +35,14 @@ export default function IndexEditor({ entityName }: Props) {
         ? prev.fields.filter((f) => f !== field)
         : [...prev.fields, field];
       return { ...prev, fields };
+    });
+  };
+
+  const setSort = (fieldIndex: number) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setNewIndex((prev) => {
+      const sort = [...(prev.sort || [])];
+      sort[fieldIndex] = e.target.value;
+      return { ...prev, sort };
     });
   };
 
@@ -52,11 +61,14 @@ export default function IndexEditor({ entityName }: Props) {
 
       {indexes.map((idx, i) => (
         <div
-          key={`${idx.fields.join('-')}-${idx.type}-${idx.unique}`}
+          key={`${idx.fields.join('-')}-${idx.type}-${idx.unique}-${idx.sort?.join(',')}`}
           className="flex items-center justify-between rounded border px-2 py-1.5 text-xs group"
         >
           <div className="min-w-0">
             <span className="font-medium">{idx.fields.join(', ')}</span>
+            {idx.sort && idx.sort.length > 0 && (
+              <span className="text-muted-foreground ml-1">({idx.sort.join(',')})</span>
+            )}
             {idx.type && idx.type !== 'btree' && (
               <span className="text-muted-foreground ml-1">({idx.type})</span>
             )}
@@ -104,6 +116,26 @@ export default function IndexEditor({ entityName }: Props) {
               ))}
             </div>
           </div>
+
+          {newIndex.fields.length > 0 && (
+            <div className="space-y-1">
+              <span className="text-xs text-muted-foreground block">Sort direction</span>
+              {newIndex.fields.map((f, i) => (
+                <div key={f} className="flex items-center justify-between gap-2">
+                  <span className="text-xs">{f}</span>
+                  <Select
+                    value={newIndex.sort?.[i] || 'asc'}
+                    onChange={setSort(i)}
+                    className="w-28"
+                  >
+                    {SORT_DIRECTIONS.map((dir) => (
+                      <option key={dir} value={dir}>{dir}</option>
+                    ))}
+                  </Select>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex gap-2">
             <div className="flex-1">

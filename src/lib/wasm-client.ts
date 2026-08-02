@@ -30,6 +30,7 @@ export interface WasmValidationResult {
 }
 
 export interface WasmRawEntity {
+  old_name?: string;
   features?: string[];
   fields: Record<string, string>;
   fieldOrder?: string[];

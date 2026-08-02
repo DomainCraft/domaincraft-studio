@@ -13,6 +13,8 @@ export const featureConfig: Record<FeatureId, FeatureConfig> = {
   audit_log: { label: 'Audit Log', color: 'bg-purple-500' },
   soft_delete: { label: 'Soft Delete', color: 'bg-amber-500' },
   optimistic_lock: { label: 'Optimistic Lock', color: 'bg-green-500' },
+  event_sourced: { label: 'Event Sourced', color: 'bg-cyan-500' },
+  cacheable: { label: 'Cacheable', color: 'bg-orange-500' },
 };
 
 export const featureOptions = FEATURES.map((id) => ({

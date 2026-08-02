@@ -12,10 +12,16 @@ export interface ParsedField {
 export type {
   AuthConfig,
   CacheConfig,
+  CORSConfig,
+  DeployConfig,
   DomainSchema,
   Project,
   MultiTenancy,
   EntityDefinition,
   IndexDefinition,
   EntityPermissions,
+  InfrastructureConfig,
+  PaginationConfig,
+  RateLimitConfig,
+  VersioningConfig,
 } from './domain.generated';

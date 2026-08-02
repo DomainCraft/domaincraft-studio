@@ -8,6 +8,10 @@ import AuthSettings from './AuthSettings';
 import CacheSettings from './CacheSettings';
 import CorsSettings from './CorsSettings';
 import DeploySettings from './DeploySettings';
+import InfrastructureSettings from './InfrastructureSettings';
+import PaginationSettings from './PaginationSettings';
+import RateLimitSettings from './RateLimitSettings';
+import VersioningSettings from './VersioningSettings';
 import type { DomainSchema, MultiTenancy } from '@/types/domain';
 
 export default function ProjectSettings() {
@@ -101,6 +105,10 @@ export default function ProjectSettings() {
       <CacheSettings />
       <CorsSettings />
       <DeploySettings />
+      <InfrastructureSettings />
+      <PaginationSettings />
+      <RateLimitSettings />
+      <VersioningSettings />
     </div>
   );
 }

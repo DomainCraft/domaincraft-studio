@@ -76,6 +76,7 @@ function wasmSchemaToDomain(ws: WasmRawSchema): ParseDomainResult {
   const fieldOrder: Record<string, string[]> = {};
   for (const [name, entity] of Object.entries(ws.entities)) {
     entities[name] = {
+      old_name: entity.old_name,
       fields: entity.fields,
       features: entity.features as EntityDefinition['features'],
       permissions: entity.permissions as EntityDefinition['permissions'],
@@ -142,6 +143,7 @@ export function serializeDomainYaml(schema: DomainSchema, fieldOrder?: Record<st
         for (const [k, v] of Object.entries(def.fields)) fields[k] = v;
       }
       const entity: Record<string, unknown> = { fields };
+      if (def.old_name) entity.old_name = def.old_name;
       if (def.features && def.features.length > 0) entity.features = def.features;
       if (def.permissions) entity.permissions = def.permissions;
       if (def.indexes && def.indexes.length > 0) entity.indexes = def.indexes;

@@ -52,6 +52,7 @@ export function parseDomainYamlFallback(yamlText: string): DomainSchema {
       const rawFields = entityDef.fields && typeof entityDef.fields === 'object' && !Array.isArray(entityDef.fields) ? entityDef.fields as Record<string, string> : {};
       const rawFeatures = Array.isArray(entityDef.features) ? entityDef.features as EntityDefinition['features'] : [];
       entities[entityName] = {
+        old_name: entityDef.old_name as string | undefined,
         fields: rawFields,
         features: rawFeatures,
         permissions: perms ? {
