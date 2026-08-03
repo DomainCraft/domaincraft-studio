@@ -1,23 +1,16 @@
 import { useState } from 'react';
 import { useValidationErrors } from '@/hooks/useValidationErrors';
-import { AlertTriangle, XCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 export default function ValidationErrors() {
-  const { hardErrors, warnings, wasmLoading } = useValidationErrors();
+  const { hardErrors, warnings } = useValidationErrors();
   const [expanded, setExpanded] = useState(false);
 
-  if (hardErrors.length === 0 && warnings.length === 0 && !wasmLoading) return null;
+  if (hardErrors.length === 0 && warnings.length === 0) return null;
 
   return (
     <div className="border-t border-themed shrink-0 bg-themed-card">
-      {wasmLoading && hardErrors.length === 0 && warnings.length === 0 && (
-        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
-          <Loader2 size={12} className="animate-spin" />
-          <span>Loading WASM validator...</span>
-        </div>
-      )}
-
       {(hardErrors.length > 0 || warnings.length > 0) && (
         <Button
           variant="ghost"

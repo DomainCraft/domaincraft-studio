@@ -1,5 +1,5 @@
 import { useDomainStore } from '@/stores/domain-store';
-import { RATE_LIMIT_POLICIES } from '@/lib/constants';
+import { SPECMETA } from '@/lib/specmeta';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
@@ -33,7 +33,7 @@ export default function RateLimitSettings() {
               })
             }
           >
-            {RATE_LIMIT_POLICIES.map((policy) => (
+            {SPECMETA.rateLimitPolicies.map((policy) => (
               <option key={policy} value={policy}>{policy}</option>
             ))}
           </Select>

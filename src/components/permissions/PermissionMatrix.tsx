@@ -1,14 +1,16 @@
 import { useDomainStore } from '@/stores/domain-store';
+import { SPECMETA } from '@/lib/specmeta';
 import { X } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
 import Checkbox from '@/components/ui/Checkbox';
 import AddItem from '@/components/ui/AddItem';
 import Button from '@/components/ui/Button';
-import { PERMISSION_KEYS } from '@/lib/constants';
+import type { EntityPermissions } from '@/types/domain';
 
-const crudOps = PERMISSION_KEYS;
+type CrudOp = keyof EntityPermissions;
 
 export default function PermissionMatrix({ entityName }: { entityName: string }) {
+  const crudOps = SPECMETA.permissionKeys as readonly CrudOp[];
   const entity = useDomainStore((s) => s.schema.entities[entityName]);
   const authRoles = useDomainStore((s) => s.schema.auth?.roles);
   const updateEntity = useDomainStore((s) => s.updateEntity);
@@ -20,7 +22,7 @@ export default function PermissionMatrix({ entityName }: { entityName: string })
 
   if (!entity) return null;
 
-  const togglePermission = (op: typeof crudOps[number], role: string) => {
+  const togglePermission = (op: CrudOp, role: string) => {
     const current = permissions[op] || [];
     let next: string[];
     if (current.includes(role)) {

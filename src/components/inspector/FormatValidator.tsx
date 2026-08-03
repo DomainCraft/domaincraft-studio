@@ -1,4 +1,4 @@
-import { STRING_FORMAT_VALIDATORS } from '@/lib/constants';
+import { getFormatValidators } from '@/lib/specmeta';
 import Button from '@/components/ui/Button';
 
 interface FormatValidatorProps {
@@ -11,7 +11,7 @@ export default function FormatValidator({ validations, onToggle }: FormatValidat
     <div>
       <span className="text-xs text-muted-foreground mb-1 block">Format</span>
       <div className="flex gap-1.5">
-        {STRING_FORMAT_VALIDATORS.map((key) => (
+        {getFormatValidators().map((key) => (
           <Button
             key={key}
             variant={validations[key] === 'true' ? 'primary' : 'ghost'}

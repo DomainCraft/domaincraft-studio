@@ -1,7 +1,6 @@
 let wasmReady = false;
 let wasmLoading = false;
 let wasmLoadError = false;
-let onReadyCallbacks: Array<() => void> = [];
 
 declare global {
   interface Window {
@@ -12,6 +11,7 @@ declare global {
     goValidate?: (yamlText: string) => string;
     goParseField?: (fieldDef: string, fieldName?: string) => string;
     goParseDomain?: (yamlText: string) => string;
+    goSpecmeta?: () => string;
     goVersion?: () => string;
   }
 }
@@ -42,8 +42,6 @@ export async function loadWasmValidator(): Promise<boolean> {
     go.run(result.instance);
     wasmReady = true;
     wasmLoading = false;
-    for (const cb of onReadyCallbacks) cb();
-    onReadyCallbacks = [];
     return true;
   } catch (e) {
     console.warn('WASM validator not available:', e);
@@ -59,15 +57,4 @@ export function isWasmReady(): boolean {
 
 export function getWasmVersion(): string | null {
   return typeof window.goVersion === 'function' ? window.goVersion() : null;
-}
-
-export function onWasmReady(callback: () => void): () => void {
-  if (wasmReady) {
-    callback();
-    return () => {};
-  }
-  onReadyCallbacks.push(callback);
-  return () => {
-    onReadyCallbacks = onReadyCallbacks.filter((cb) => cb !== callback);
-  };
 }

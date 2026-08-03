@@ -73,14 +73,13 @@ Generated files are committed to the repository, so the CI build does not need t
 │   │   ├── useFieldEditor.ts        # Field editor state + debounce logic (200ms)
 │   │   └── useValidationErrors.ts   # WASM validation orchestration (500ms debounce)
 │   ├── stores/
-│   │   ├── domain-store.ts      # Domain schema state + fieldOrder + schemaVersion + getAllRoles
-│   │   ├── domain-mutations.ts  # Schema mutation helpers with debounced YAML serialization (200ms)
+│   │   ├── domain-store.ts      # Domain schema state + mutations + debounced YAML serialization (200ms)
 │   │   ├── canvas-store.ts      # React Flow nodes/edges state
 │   │   └── ui-store.ts          # UI state (panels, dark mode, view mode)
 │   ├── lib/
 │   │   ├── yaml-parser.ts           # YAML <-> DomainSchema conversion (WASM + fallback)
 │   │   ├── yaml-parser-fallback.ts  # Client-side fallback parser (testable)
-│   │   ├── wasm-loader.ts           # WASM binary loader + onWasmReady callback
+│   │   ├── wasm-loader.ts           # WASM binary loader + version
 │   │   ├── wasm-client.ts           # WASM API calls (goValidate, goParseField, goParseDomain)
 │   │   ├── validator.ts             # WASM-based validation wrapper
 │   │   ├── canvas-helpers.ts        # Entity-to-node/edge transformation (pure functions)

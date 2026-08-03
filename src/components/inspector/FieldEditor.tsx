@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
-import { PRIMITIVE_FIELD_TYPES, STRING_FIELD_TYPES, NUMERIC_FIELD_TYPES, ON_DELETE_VALUES, STRING_FORMAT_VALIDATORS, NUMERIC_VALIDATION_MODIFIERS } from '@/lib/constants';
+import { SPECMETA, getFormatValidators } from '@/lib/specmeta';
 import { useFieldEditor } from '@/hooks/useFieldEditor';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
@@ -23,13 +23,13 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
       target: ['relation', 'enum'].includes(newType) ? localParsed.target : undefined,
       validations: { ...localParsed.validations },
     };
-    if (!STRING_FIELD_TYPES.has(newType)) {
-      for (const key of [...STRING_FORMAT_VALIDATORS, 'min', 'max', 'regex']) {
+    if (!SPECMETA.stringFieldTypes.includes(newType)) {
+      for (const key of [...getFormatValidators(), 'min', 'max', 'regex']) {
         delete next.validations[key];
       }
     }
-    if (!NUMERIC_FIELD_TYPES.has(newType)) {
-      for (const key of NUMERIC_VALIDATION_MODIFIERS) {
+    if (!SPECMETA.numericFieldTypes.includes(newType)) {
+      for (const key of SPECMETA.numericValidationModifiers) {
         delete next.validations[key];
       }
     }
@@ -38,8 +38,8 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
 
   const isRelation = localParsed.type === 'relation';
   const isEnum = localParsed.type === 'enum';
-  const isString = STRING_FIELD_TYPES.has(localParsed.type);
-  const isNumeric = NUMERIC_FIELD_TYPES.has(localParsed.type);
+  const isString = SPECMETA.stringFieldTypes.includes(localParsed.type);
+  const isNumeric = SPECMETA.numericFieldTypes.includes(localParsed.type);
   const canBeArray = !isRelation;
 
   return (
@@ -51,7 +51,7 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
         value={localParsed.type}
         onChange={(e) => handleTypeChange(e.target.value)}
       >
-        {PRIMITIVE_FIELD_TYPES.map((t) => (
+        {SPECMETA.primitiveFieldTypes.map((t) => (
           <option key={t} value={t}>{t}</option>
         ))}
         <option value="relation">relation</option>
@@ -151,7 +151,7 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
             onChange={(e) => updateValidation('on_delete', e.target.value || null)}
           >
             <option value="">None</option>
-            {ON_DELETE_VALUES.map((val) => (
+            {SPECMETA.onDeleteValues.map((val) => (
               <option key={val} value={val}>{val}</option>
             ))}
           </Select>

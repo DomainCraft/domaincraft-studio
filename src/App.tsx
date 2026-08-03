@@ -1,6 +1,8 @@
-import { useEffect, Component, type ReactNode } from 'react';
+import { useEffect, useState, Component, type ReactNode } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { useUIStore } from '@/stores/ui-store';
+import { loadSpecmetaFromWasm } from '@/lib/specmeta';
+import { loadWasmValidator } from '@/lib/wasm-loader';
 import Button from '@/components/ui/Button';
 
 class ErrorBoundary extends Component<
@@ -38,10 +40,38 @@ class ErrorBoundary extends Component<
 
 export default function App() {
   const darkMode = useUIStore((s) => s.darkMode);
+  const [booted, setBooted] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Boot the WASM backend once. If it fails, the app still boots — specmeta
+      // falls back to its frozen baseline and validation is skipped.
+      await loadWasmValidator();
+      if (!cancelled) {
+        loadSpecmetaFromWasm();
+        setBooted(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!booted) {
+    return (
+      <div className="flex items-center justify-center h-screen w-screen bg-background text-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-sm text-muted-foreground">Loading DomainCraft Studio…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>

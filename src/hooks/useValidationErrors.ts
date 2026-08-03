@@ -1,27 +1,17 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
 import { validateDomainSchema, type ValidationError } from '@/lib/validator';
-import { isWasmReady, onWasmReady, loadWasmValidator } from '@/lib/wasm-loader';
 
 export function useValidationErrors() {
   const schemaVersion = useDomainStore((s) => s.schemaVersion);
   const [errors, setErrors] = useState<ValidationError[]>([]);
-  const [wasmLoading, setWasmLoading] = useState(() => !isWasmReady());
-
-  useEffect(() => {
-    if (!isWasmReady()) {
-      loadWasmValidator();
-    }
-    return onWasmReady(() => setWasmLoading(false));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
       const schema = useDomainStore.getState().schema;
-      validateDomainSchema(schema).then((result) => {
-        if (!cancelled) setErrors(result);
-      });
+      const result = validateDomainSchema(schema);
+      if (!cancelled) setErrors(result);
     }, 500);
     return () => {
       cancelled = true;
@@ -38,5 +28,5 @@ export function useValidationErrors() {
     return { hardErrors: hard, warnings: warn };
   }, [errors]);
 
-  return { errors, hardErrors, warnings, wasmLoading };
+  return { errors, hardErrors, warnings };
 }

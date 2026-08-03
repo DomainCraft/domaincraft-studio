@@ -1,4 +1,4 @@
-import { loadWasmValidator, isWasmReady } from './wasm-loader';
+import { isWasmReady } from './wasm-loader';
 import { wasmValidate } from './wasm-client';
 import type { DomainSchema } from '@/types/domain';
 import { serializeDomainYaml } from './yaml-parser';
@@ -9,18 +9,9 @@ export interface ValidationError {
   warning: boolean;
 }
 
-export async function validateDomainSchema(schema: DomainSchema): Promise<ValidationError[]> {
-  if (isWasmReady()) {
-    return validateWithWasm(schema);
-  }
-
-  const loaded = await loadWasmValidator();
-  if (loaded && isWasmReady()) {
-    return validateWithWasm(schema);
-  }
-
-  console.warn('WASM validator unavailable — skipping validation');
-  return [];
+export function validateDomainSchema(schema: DomainSchema): ValidationError[] {
+  if (!isWasmReady()) return [];
+  return validateWithWasm(schema);
 }
 
 function validateWithWasm(schema: DomainSchema): ValidationError[] {

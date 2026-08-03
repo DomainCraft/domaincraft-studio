@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
+import { getFormatValidators } from '@/lib/specmeta';
 import { parseFieldDefinition, serializeFieldDefinition } from '@/lib/yaml-parser';
-import { STRING_FORMAT_VALIDATORS } from '@/lib/constants';
 import type { ParsedField } from '@/types/domain';
 import { useDebouncedCallback } from './useDebouncedCallback';
 
@@ -48,7 +48,7 @@ export function useFieldEditor(entityName: string, fieldName: string) {
       if (next.validations[key] === 'true') {
         delete next.validations[key];
       } else {
-        STRING_FORMAT_VALIDATORS.forEach((fv) => delete next.validations[fv]);
+        getFormatValidators().forEach((fv) => delete next.validations[fv]);
         next.validations[key] = 'true';
       }
       debouncedUpdateField(next);

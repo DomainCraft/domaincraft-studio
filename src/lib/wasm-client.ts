@@ -1,7 +1,5 @@
 import { isWasmReady } from './wasm-loader';
 
-export { isWasmReady };
-
 export interface WasmParsedField {
   Name: string;
   Type: string;

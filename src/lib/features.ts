@@ -1,4 +1,4 @@
-import { FEATURES } from './constants';
+import { SPECMETA } from '@/lib/specmeta';
 import type { EntityDefinition } from '@/types/domain';
 
 export type FeatureId = NonNullable<EntityDefinition['features']>[number];
@@ -17,7 +17,17 @@ export const featureConfig: Record<FeatureId, FeatureConfig> = {
   cacheable: { label: 'Cacheable', color: 'bg-orange-500' },
 };
 
-export const featureOptions = FEATURES.map((id) => ({
-  id,
-  ...featureConfig[id],
-}));
+export interface FeatureOption extends FeatureConfig {
+  id: FeatureId;
+}
+
+// Feature list comes from core specmeta (via the WASM binary), so an id that is
+// not known yet gets a safe fallback label/color.
+const FALLBACK_CONFIG: FeatureConfig = { label: 'Feature', color: 'bg-gray-500' };
+
+export function getFeatureOptions(): FeatureOption[] {
+  return SPECMETA.features.map((id) => ({
+    id: id as FeatureId,
+    ...(featureConfig[id as FeatureId] ?? FALLBACK_CONFIG),
+  }));
+}

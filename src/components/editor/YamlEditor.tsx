@@ -1,7 +1,8 @@
 import Editor from '@monaco-editor/react';
 import { useDomainStore } from '@/stores/domain-store';
 import { useUIStore } from '@/stores/ui-store';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
 const editorOptions = {
   minimap: { enabled: false },
@@ -18,16 +19,14 @@ export default function YamlEditor() {
   const setYamlText = useDomainStore(s => s.setYamlText);
   const syncFromYaml = useDomainStore(s => s.syncFromYaml);
   const darkMode = useUIStore(s => s.darkMode);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const debouncedSyncFromYaml = useDebouncedCallback(syncFromYaml, 500);
 
   const handleChange = useCallback((value: string | undefined) => {
     if (!value) return;
     setYamlText(value);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      syncFromYaml();
-    }, 500);
-  }, [setYamlText, syncFromYaml]);
+    debouncedSyncFromYaml();
+  }, [setYamlText, debouncedSyncFromYaml]);
 
   return (
     <div className="w-full h-full">

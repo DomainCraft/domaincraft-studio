@@ -1,5 +1,5 @@
 import { useDomainStore } from '@/stores/domain-store';
-import { CACHE_PROVIDERS } from '@/lib/constants';
+import { SPECMETA } from '@/lib/specmeta';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
@@ -34,7 +34,7 @@ export default function CacheSettings() {
             }
           >
             <option value="">-- Select --</option>
-            {CACHE_PROVIDERS.map((provider) => (
+            {SPECMETA.cacheProviders.map((provider) => (
               <option key={provider} value={provider}>{provider}</option>
             ))}
           </Select>

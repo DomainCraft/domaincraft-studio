@@ -1,24 +1,26 @@
 import { useDomainStore } from '@/stores/domain-store';
-import { INFRA_QUEUES, INFRA_CACHE_STORES, INFRA_SECRET_STORES, INFRA_STORAGES } from '@/lib/constants';
+import { SPECMETA } from '@/lib/specmeta';
 import Select from '@/components/ui/Select';
 import FormSection from '@/components/ui/FormSection';
 import type { InfrastructureConfig } from '@/types/domain';
 
-const sections: {
+interface Section {
   key: keyof InfrastructureConfig;
   label: string;
   placeholder: string;
   options: readonly string[];
-}[] = [
-  { key: 'queue', label: 'Message Queue', placeholder: 'pubsub', options: INFRA_QUEUES },
-  { key: 'cache', label: 'Distributed Cache', placeholder: 'redis', options: INFRA_CACHE_STORES },
-  { key: 'secrets', label: 'Secrets Store', placeholder: 'local', options: INFRA_SECRET_STORES },
-  { key: 'storage', label: 'Object Storage', placeholder: 'local', options: INFRA_STORAGES },
-];
+}
 
 export default function InfrastructureSettings() {
   const infra = useDomainStore((s) => s.schema.project.infrastructure);
   const updateProject = useDomainStore((s) => s.updateProject);
+
+  const sections: Section[] = [
+    { key: 'queue', label: 'Message Queue', placeholder: 'pubsub', options: SPECMETA.infraQueues },
+    { key: 'cache', label: 'Distributed Cache', placeholder: 'redis', options: SPECMETA.infraCacheStores },
+    { key: 'secrets', label: 'Secrets Store', placeholder: 'local', options: SPECMETA.infraSecretStores },
+    { key: 'storage', label: 'Object Storage', placeholder: 'local', options: SPECMETA.infraStores },
+  ];
 
   const setField = (key: keyof InfrastructureConfig) => (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value || undefined;

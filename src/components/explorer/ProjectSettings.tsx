@@ -1,5 +1,5 @@
 import { useDomainStore } from '@/stores/domain-store';
-import { DATABASES, API_STYLES, MULTI_TENANCY_MODES } from '@/lib/constants';
+import { SPECMETA } from '@/lib/specmeta';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
@@ -56,7 +56,7 @@ export default function ProjectSettings() {
           value={database || 'postgresql'}
           onChange={(e) => updateSchemaField('database', e.target.value as DomainSchema['database'])}
         >
-          {DATABASES.map((db) => (
+          {SPECMETA.databases.map((db) => (
             <option key={db} value={db}>{db}</option>
           ))}
         </Select>
@@ -66,7 +66,7 @@ export default function ProjectSettings() {
           value={api_style || 'rest'}
           onChange={(e) => updateSchemaField('api_style', e.target.value as DomainSchema['api_style'])}
         >
-          {API_STYLES.map((style) => (
+          {SPECMETA.apiStyles.map((style) => (
             <option key={style} value={style}>{style}</option>
           ))}
         </Select>
@@ -95,7 +95,7 @@ export default function ProjectSettings() {
               })
             }
           >
-            {MULTI_TENANCY_MODES.map((mode) => (
+            {SPECMETA.multiTenancyModes.map((mode) => (
               <option key={mode} value={mode}>{mode}</option>
             ))}
           </Select>

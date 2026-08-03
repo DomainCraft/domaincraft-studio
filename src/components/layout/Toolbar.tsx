@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { useDomainStore } from '@/stores/domain-store';
 import { useCanvasStore } from '@/stores/canvas-store';
@@ -17,7 +16,7 @@ import {
   AlignVerticalSpaceAround,
 } from 'lucide-react';
 import { exportYaml, importYaml } from '@/lib/file-io';
-import { getWasmVersion, isWasmReady, onWasmReady } from '@/lib/wasm-loader';
+import { getWasmVersion } from '@/lib/wasm-loader';
 import Button from '@/components/ui/Button';
 
 const viewModes = [
@@ -38,14 +37,7 @@ export default function Toolbar() {
   const syncFromYaml = useDomainStore((s) => s.syncFromYaml);
   const autoLayout = useCanvasStore((s) => s.autoLayout);
   const { fitView } = useReactFlow();
-  const [wasmVersion, setWasmVersion] = useState<string | null>(() =>
-    isWasmReady() ? getWasmVersion() : null,
-  );
-
-  useEffect(() => {
-    if (wasmVersion) return;
-    return onWasmReady(() => setWasmVersion(getWasmVersion()));
-  }, [wasmVersion]);
+  const wasmVersion = getWasmVersion();
 
   const handleAutoLayout = () => {
     autoLayout('TB');

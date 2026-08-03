@@ -10,11 +10,9 @@ import type { WasmParsedField } from '@/lib/wasm-client';
 vi.mock('@/lib/wasm-loader', () => ({
   isWasmReady: () => false,
   loadWasmValidator: () => Promise.resolve(false),
-  onWasmReady: () => () => {},
 }));
 
 vi.mock('@/lib/wasm-client', () => ({
-  isWasmReady: () => false,
   wasmParseField: () => null,
   wasmParseDomain: () => null,
   wasmValidate: () => null,

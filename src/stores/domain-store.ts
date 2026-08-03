@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { DomainSchema } from '@/types/domain';
+import type { DomainSchema, EntityDefinition, IndexDefinition, AuthConfig } from '@/types/domain';
 import { parseDomainYaml, serializeDomainYaml } from '@/lib/yaml-parser';
-import { createMutations } from './domain-mutations';
+import { SPECMETA } from '@/lib/specmeta';
 
 interface DomainState {
   schema: DomainSchema;
@@ -20,7 +20,7 @@ interface DomainState {
   addEntity: (name: string) => void;
   removeEntity: (name: string) => void;
   renameEntity: (oldName: string, newName: string) => void;
-  updateEntity: (name: string, update: Partial<import('@/types/domain').EntityDefinition>) => void;
+  updateEntity: (name: string, update: Partial<EntityDefinition>) => void;
   selectEntity: (name: string | null) => void;
 
   addField: (entityName: string, fieldName: string, definition: string) => void;
@@ -34,11 +34,11 @@ interface DomainState {
 
   updateProject: (update: Partial<DomainSchema['project']>) => void;
   updateSchemaField: <K extends keyof DomainSchema>(key: K, value: DomainSchema[K]) => void;
-  updateAuth: (update: Partial<import('@/types/domain').AuthConfig>) => void;
+  updateAuth: (update: Partial<AuthConfig>) => void;
 
-  addIndex: (entityName: string, index: import('@/types/domain').IndexDefinition) => void;
+  addIndex: (entityName: string, index: IndexDefinition) => void;
   removeIndex: (entityName: string, indexIdx: number) => void;
-  updateIndex: (entityName: string, indexIdx: number, index: import('@/types/domain').IndexDefinition) => void;
+  updateIndex: (entityName: string, indexIdx: number, index: IndexDefinition) => void;
 
   addSeedEntry: (entityName: string, entry: Record<string, unknown>) => void;
   removeSeedEntry: (entityName: string, entryIdx: number) => void;
@@ -56,11 +56,44 @@ const defaultSchema: DomainSchema = {
   entities: {},
 };
 
+const YAML_DEBOUNCE_MS = 200;
+
 export const useDomainStore = create<DomainState>((set, get) => {
-  const mutations = createMutations(
-    get as () => DomainState,
-    set as (p: Partial<DomainState>) => void,
-  );
+  let yamlTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function applyMutation(mutator: (schema: DomainSchema) => DomainSchema) {
+    set({
+      schema: mutator(get().schema),
+      lastChangeSource: 'gui',
+      schemaVersion: get().schemaVersion + 1,
+    });
+    if (yamlTimer) clearTimeout(yamlTimer);
+    yamlTimer = setTimeout(() => {
+      set({ yamlText: serializeDomainYaml(get().schema, get().fieldOrder) });
+    }, YAML_DEBOUNCE_MS);
+  }
+
+  function setFieldOrder(entityName: string, order: string[]) {
+    set({ fieldOrder: { ...get().fieldOrder, [entityName]: order } });
+  }
+
+  function deleteFieldOrder(entityName: string) {
+    const next = { ...get().fieldOrder };
+    delete next[entityName];
+    set({ fieldOrder: next });
+  }
+
+  function getFieldOrder(entityName: string): string[] | undefined {
+    return get().fieldOrder[entityName];
+  }
+
+  function updateEntityFields(entityName: string, updater: (entity: EntityDefinition) => EntityDefinition) {
+    applyMutation((s) => {
+      const entity = s.entities[entityName];
+      if (!entity) return s;
+      return { ...s, entities: { ...s.entities, [entityName]: updater(entity) } };
+    });
+  }
 
   return {
     schema: defaultSchema,
@@ -96,38 +129,198 @@ export const useDomainStore = create<DomainState>((set, get) => {
     selectField: (fieldName) => set({ selectedField: fieldName }),
 
     addEntity: (name) => {
-      mutations.addEntity(name);
+      applyMutation((s) => ({
+        ...s,
+        entities: {
+          ...s.entities,
+          [name]: { fields: { id: 'uuid [primary]' } },
+        },
+      }));
+      setFieldOrder(name, ['id']);
       set({ selectedEntity: name, selectedField: null });
     },
 
     removeEntity: (name) => {
-      mutations.removeEntity(name);
+      applyMutation((s) => {
+        const rest = { ...s.entities };
+        delete rest[name];
+        return { ...s, entities: rest };
+      });
+      deleteFieldOrder(name);
     },
 
-    renameEntity: mutations.renameEntity,
-    updateEntity: mutations.updateEntity,
-    addField: mutations.addField,
-
-    removeField: (entityName, fieldName) => {
-      mutations.removeField(entityName, fieldName);
+    renameEntity: (oldName: string, newName: string) => {
+      if (oldName === newName || get().schema.entities[newName]) return;
+      applyMutation((s) => {
+        const entity = s.entities[oldName];
+        if (!entity) return s;
+        const rest = { ...s.entities };
+        delete rest[oldName];
+        // Record old_name so the CLI migration engine detects the rename
+        // and can offer to rename orphaned custom files.
+        return { ...s, entities: { ...rest, [newName]: { ...entity, old_name: oldName } } };
+      });
+      const order = getFieldOrder(oldName);
+      if (order) {
+        setFieldOrder(newName, order);
+        deleteFieldOrder(oldName);
+      }
+      set({ selectedEntity: newName });
     },
 
-    updateField: mutations.updateField,
-    addEnum: mutations.addEnum,
-    removeEnum: mutations.removeEnum,
-    updateEnum: mutations.updateEnum,
-    updateProject: mutations.updateProject,
-    updateSchemaField: mutations.updateSchemaField,
-    updateAuth: mutations.updateAuth,
-    addIndex: mutations.addIndex,
-    removeIndex: mutations.removeIndex,
-    updateIndex: mutations.updateIndex,
-    addSeedEntry: mutations.addSeedEntry,
-    removeSeedEntry: mutations.removeSeedEntry,
-    updateSeedEntry: mutations.updateSeedEntry,
+    updateEntity: (name: string, update: Partial<EntityDefinition>) => {
+      updateEntityFields(name, (entity) => ({ ...entity, ...update }));
+    },
 
-    addRoleToEntity: mutations.addRoleToEntity,
-    removeRole: mutations.removeRole,
+    addField: (entityName: string, fieldName: string, definition: string) => {
+      const entity = get().schema.entities[entityName];
+      if (!entity || entity.fields[fieldName]) return;
+      updateEntityFields(entityName, (current) => ({
+        ...current,
+        fields: { ...current.fields, [fieldName]: definition },
+      }));
+      const order = getFieldOrder(entityName) || Object.keys(entity.fields);
+      if (!order.includes(fieldName)) {
+        setFieldOrder(entityName, [...order, fieldName]);
+      }
+    },
+
+    removeField: (entityName: string, fieldName: string) => {
+      updateEntityFields(entityName, (entity) => {
+        const rest = { ...entity.fields };
+        delete rest[fieldName];
+        return { ...entity, fields: rest };
+      });
+      const order = getFieldOrder(entityName);
+      if (order) {
+        setFieldOrder(entityName, order.filter((k) => k !== fieldName));
+      }
+    },
+
+    updateField: (entityName: string, fieldName: string, definition: string) => {
+      updateEntityFields(entityName, (entity) => ({
+        ...entity,
+        fields: { ...entity.fields, [fieldName]: definition },
+      }));
+    },
+
+    addEnum: (name: string, values: string[]) => {
+      applyMutation((s) => ({
+        ...s,
+        enums: { ...(s.enums || {}), [name]: values },
+      }));
+    },
+
+    removeEnum: (name: string) => {
+      applyMutation((s) => {
+        const rest = { ...(s.enums || {}) };
+        delete rest[name];
+        return { ...s, enums: rest };
+      });
+    },
+
+    updateEnum: (name: string, values: string[]) => {
+      applyMutation((s) => ({
+        ...s,
+        enums: { ...(s.enums || {}), [name]: values },
+      }));
+    },
+
+    updateProject: (update: Partial<DomainSchema['project']>) => {
+      applyMutation((s) => ({
+        ...s,
+        project: { ...s.project, ...update },
+      }));
+    },
+
+    updateSchemaField: <K extends keyof DomainSchema>(key: K, value: DomainSchema[K]) => {
+      applyMutation((s) => ({ ...s, [key]: value }));
+    },
+
+    updateAuth: (update: Partial<AuthConfig>) => {
+      applyMutation((s) => ({
+        ...s,
+        auth: { ...(s.auth || { type: 'jwt' as const }), ...update },
+      }));
+    },
+
+    addIndex: (entityName: string, index: IndexDefinition) => {
+      updateEntityFields(entityName, (entity) => ({
+        ...entity,
+        indexes: [...(entity.indexes || []), index],
+      }));
+    },
+
+    removeIndex: (entityName: string, indexIdx: number) => {
+      updateEntityFields(entityName, (entity) => {
+        if (!entity.indexes) return entity;
+        return { ...entity, indexes: entity.indexes.filter((_, i) => i !== indexIdx) };
+      });
+    },
+
+    updateIndex: (entityName: string, indexIdx: number, index: IndexDefinition) => {
+      updateEntityFields(entityName, (entity) => {
+        if (!entity.indexes) return entity;
+        const indexes = [...entity.indexes];
+        indexes[indexIdx] = index;
+        return { ...entity, indexes };
+      });
+    },
+
+    addSeedEntry: (entityName: string, entry: Record<string, unknown>) => {
+      updateEntityFields(entityName, (entity) => ({
+        ...entity,
+        seed: [...(entity.seed || []), entry],
+      }));
+    },
+
+    removeSeedEntry: (entityName: string, entryIdx: number) => {
+      updateEntityFields(entityName, (entity) => {
+        if (!entity.seed) return entity;
+        return { ...entity, seed: entity.seed.filter((_, i) => i !== entryIdx) };
+      });
+    },
+
+    updateSeedEntry: (entityName: string, entryIdx: number, entry: Record<string, unknown>) => {
+      updateEntityFields(entityName, (entity) => {
+        if (!entity.seed) return entity;
+        const seed = [...entity.seed];
+        seed[entryIdx] = entry;
+        return { ...entity, seed };
+      });
+    },
+
+    addRoleToEntity: (entityName: string, role: string) => {
+      updateEntityFields(entityName, (entity) => {
+        const permissions = { ...entity.permissions };
+        permissions.read = [...(permissions.read || []), role];
+        return { ...entity, permissions };
+      });
+    },
+
+    removeRole: (role: string) => {
+      applyMutation((s) => {
+        const nextEntities = { ...s.entities };
+        for (const [name, ent] of Object.entries(s.entities)) {
+          if (!ent.permissions) continue;
+          const nextPerms = { ...ent.permissions };
+          let changed = false;
+          const permissionOps = SPECMETA.permissionKeys as Array<keyof NonNullable<EntityDefinition['permissions']>>;
+          for (const op of permissionOps) {
+            const current = nextPerms[op] || [];
+            const filtered = current.filter((r) => r !== role);
+            if (filtered.length !== current.length) {
+              nextPerms[op] = filtered;
+              changed = true;
+            }
+          }
+          if (changed) {
+            nextEntities[name] = { ...ent, permissions: nextPerms };
+          }
+        }
+        return { ...s, entities: nextEntities };
+      });
+    },
 
     getAllRoles: () => {
       const { schema } = get();

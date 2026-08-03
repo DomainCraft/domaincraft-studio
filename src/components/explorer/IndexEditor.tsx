@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDomainStore } from '@/stores/domain-store';
+import { SPECMETA } from '@/lib/specmeta';
 import { Plus, Trash2, X } from 'lucide-react';
-import { INDEX_TYPES, SORT_DIRECTIONS } from '@/lib/constants';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
 import Button from '@/components/ui/Button';
@@ -128,7 +128,7 @@ export default function IndexEditor({ entityName }: Props) {
                     onChange={setSort(i)}
                     className="w-28"
                   >
-                    {SORT_DIRECTIONS.map((dir) => (
+                    {SPECMETA.sortDirections.map((dir) => (
                       <option key={dir} value={dir}>{dir}</option>
                     ))}
                   </Select>
@@ -144,7 +144,7 @@ export default function IndexEditor({ entityName }: Props) {
                 value={newIndex.type || 'btree'}
                 onChange={(e) => setNewIndex({ ...newIndex, type: e.target.value as IndexDefinition['type'] })}
               >
-                {INDEX_TYPES.map((t) => (
+                {SPECMETA.indexTypes.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </Select>

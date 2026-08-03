@@ -5,7 +5,7 @@ import PermissionMatrix from '@/components/permissions/PermissionMatrix';
 import SeedEditor from '@/components/seed/SeedEditor';
 import IndexEditor from '@/components/explorer/IndexEditor';
 import { Pencil } from 'lucide-react';
-import { featureOptions } from '@/lib/features';
+import { getFeatureOptions, type FeatureId } from '@/lib/features';
 import { featureIcons } from '@/lib/feature-icons';
 import TabBar from '@/components/ui/TabBar';
 import AddItem from '@/components/ui/AddItem';
@@ -31,6 +31,7 @@ export default function EntityInspector({ entityName }: { entityName: string }) 
   const [activeTab, setActiveTab] = useState('fields');
   const [editingName, setEditingName] = useState(false);
   const [renameValue, setRenameValue] = useState(entityName);
+  const featureOptions = getFeatureOptions();
 
   const hasConflict = useDomainStore(
     useCallback(
@@ -44,7 +45,7 @@ export default function EntityInspector({ entityName }: { entityName: string }) 
   const features = entity.features || [];
   const fields = entity.fields || {};
 
-  const toggleFeature = (feature: typeof featureOptions[number]['id']) => {
+  const toggleFeature = (feature: FeatureId) => {
     const current = features || [];
     if (current.includes(feature)) {
       updateEntity(entityName, { features: current.filter((f) => f !== feature) });

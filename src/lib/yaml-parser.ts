@@ -1,20 +1,16 @@
 import { stringify } from 'yaml';
 import type { DomainSchema, EntityDefinition, ParsedField, AuthConfig } from '@/types/domain';
-import { DATABASES, API_STYLES, AUTH_TYPES } from '@/lib/constants';
+import { SPECMETA } from './specmeta';
+import { isWasmReady } from './wasm-loader';
 import {
   wasmParseField,
   wasmParseDomain,
-  isWasmReady,
   type WasmParsedField,
   type WasmRawSchema,
 } from './wasm-client';
 import { parseFieldDefinitionFallback, parseDomainYamlFallback } from './yaml-parser-fallback';
 
 export { parseFieldDefinitionFallback, parseDomainYamlFallback };
-
-const DATABASE_SET = new Set<string>(DATABASES);
-const API_STYLE_SET = new Set<string>(API_STYLES);
-const AUTH_TYPE_SET = new Set<string>(AUTH_TYPES);
 
 export function wasmFieldToParsed(wf: WasmParsedField, fallbackName: string): ParsedField {
   const validations = { ...wf.Validations };
@@ -63,9 +59,13 @@ export function parseDomainYaml(yamlText: string): ParseDomainResult {
 }
 
 function wasmSchemaToDomain(ws: WasmRawSchema): ParseDomainResult {
+  const authTypeSet = new Set(SPECMETA.authTypes);
+  const databaseSet = new Set(SPECMETA.databases);
+  const apiStyleSet = new Set(SPECMETA.apiStyles);
+
   const auth: AuthConfig | undefined = ws.auth
     ? {
-        type: AUTH_TYPE_SET.has(ws.auth.type as AuthConfig['type']) ? (ws.auth.type as AuthConfig['type']) : 'none',
+        type: authTypeSet.has(ws.auth.type as AuthConfig['type']) ? (ws.auth.type as AuthConfig['type']) : 'none',
         entity: ws.auth.entity,
         roles: ws.auth.roles,
         endpoints: ws.auth.endpoints,
@@ -90,17 +90,17 @@ function wasmSchemaToDomain(ws: WasmRawSchema): ParseDomainResult {
 
   let apiStyle: DomainSchema['api_style'] | undefined;
   if (ws.apiStyle) {
-    if (API_STYLE_SET.has(ws.apiStyle)) {
+    if (apiStyleSet.has(ws.apiStyle)) {
       apiStyle = ws.apiStyle as DomainSchema['api_style'];
     } else {
-      console.warn(`[WASM contract] Unknown apiStyle value: "${ws.apiStyle}". Expected one of: ${API_STYLES.join(', ')}`);
+      console.warn(`[WASM contract] Unknown apiStyle value: "${ws.apiStyle}". Expected one of: ${SPECMETA.apiStyles.join(', ')}`);
     }
   }
 
   return {
     schema: {
       project: ws.project as DomainSchema['project'],
-      database: ws.database && DATABASE_SET.has(ws.database)
+      database: ws.database && databaseSet.has(ws.database)
         ? ws.database as DomainSchema['database']
         : undefined,
       auth,
@@ -113,17 +113,20 @@ function wasmSchemaToDomain(ws: WasmRawSchema): ParseDomainResult {
 }
 
 export function serializeDomainYaml(schema: DomainSchema, fieldOrder?: Record<string, string[]>): string {
+  const authTypeSet = new Set(SPECMETA.authTypes);
+  const apiStyleSet = new Set(SPECMETA.apiStyles);
+
   const raw: Record<string, unknown> = { project: schema.project };
   if (schema.database) raw.database = schema.database;
   if (schema.auth) {
     raw.auth = {
-      type: AUTH_TYPE_SET.has(schema.auth.type) ? schema.auth.type : 'none',
+      type: authTypeSet.has(schema.auth.type) ? schema.auth.type : 'none',
       ...(schema.auth.entity && { entity: schema.auth.entity }),
       ...(schema.auth.roles && schema.auth.roles.length > 0 && { roles: schema.auth.roles }),
       ...(schema.auth.endpoints && { endpoints: schema.auth.endpoints }),
     };
   }
-  if (schema.api_style && API_STYLE_SET.has(schema.api_style)) raw.api_style = schema.api_style;
+  if (schema.api_style && apiStyleSet.has(schema.api_style)) raw.api_style = schema.api_style;
   if (schema.enums && Object.keys(schema.enums).length > 0) {
     raw.enums = schema.enums;
   }
