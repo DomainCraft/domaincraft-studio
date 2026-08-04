@@ -47,7 +47,7 @@ function EntityNode({ data, selected }: NodeProps) {
             return (
               <span
                 key={feat}
-                title={config.label}
+                aria-label={config.label}
                 className={`${config.color} rounded p-0.5 flex items-center justify-center`}
               >
                 <Icon size={12} className="text-white" />
@@ -82,11 +82,11 @@ function EntityNode({ data, selected }: NodeProps) {
               </span>
 
               {isReadonly && (
-                <ShieldCheck size={10} className="text-sky-500 shrink-0" title="Readonly (server-owned)" />
+                <ShieldCheck size={10} className="text-sky-500 shrink-0" aria-label="Readonly (server-owned)" />
               )}
 
               {field.validations?.required === 'true' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Required" />
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" aria-label="Required" />
               )}
 
               <span className={`ml-auto truncate text-[10px] ${
