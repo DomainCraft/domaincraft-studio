@@ -35,11 +35,12 @@ function toWasmField(def: string, name: string): WasmParsedField {
     IsOptional: fallback.validations.optional === 'true',
     IsUnique: fallback.validations.unique === 'true',
     IsHidden: fallback.validations.hidden === 'true',
+    IsReadonly: fallback.validations.readonly === 'true',
     IsRequired: fallback.validations.required === 'true',
     IsMany: fallback.validations.many === 'true',
     OnDelete: fallback.validations.on_delete,
     Validations: Object.fromEntries(
-      Object.entries(fallback.validations).filter(([k]) => !['primary', 'optional', 'unique', 'hidden', 'required', 'many', 'on_delete', 'default'].includes(k))
+      Object.entries(fallback.validations).filter(([k]) => !['primary', 'optional', 'unique', 'hidden', 'readonly', 'required', 'many', 'on_delete', 'default'].includes(k))
     ),
     DefaultValue: isFunc ? rawDefault?.slice(0, -2) : rawDefault,
     DefaultIsFunc: isFunc,
@@ -60,6 +61,7 @@ const FIELD_CASES: Array<{ def: string; name: string }> = [
   { name: 'isActive', def: 'boolean [default:true]' },
   { name: 'createdAt', def: 'datetime [default:now()]' },
   { name: 'roles', def: 'array(string) [required]' },
+  { name: 'balance', def: 'decimal [required, readonly, gte:0]' },
 ];
 
 describe('WASM fallback parity', () => {
@@ -79,6 +81,7 @@ describe('WASM fallback parity', () => {
         IsOptional: false,
         IsUnique: true,
         IsHidden: false,
+        IsReadonly: false,
         IsRequired: false,
         IsMany: false,
         Validations: {},
@@ -96,6 +99,7 @@ describe('WASM fallback parity', () => {
         IsOptional: true,
         IsUnique: false,
         IsHidden: false,
+        IsReadonly: false,
         IsRequired: false,
         IsMany: false,
         OnDelete: 'set_null',
@@ -108,14 +112,14 @@ describe('WASM fallback parity', () => {
     it('transfers default value and function defaults', () => {
       const literal = wasmFieldToParsed({
         Name: 'isActive', Type: 'boolean', IsPrimary: false, IsOptional: false,
-        IsUnique: false, IsHidden: false, IsRequired: false, IsMany: false,
+        IsUnique: false, IsHidden: false, IsReadonly: false, IsRequired: false, IsMany: false,
         Validations: {}, DefaultValue: 'true', DefaultIsFunc: false,
       }, 'isActive');
       expect(literal.validations.default).toBe('true');
 
       const func = wasmFieldToParsed({
         Name: 'createdAt', Type: 'datetime', IsPrimary: false, IsOptional: false,
-        IsUnique: false, IsHidden: false, IsRequired: false, IsMany: false,
+        IsUnique: false, IsHidden: false, IsReadonly: false, IsRequired: false, IsMany: false,
         Validations: {}, DefaultValue: 'now', DefaultIsFunc: true,
       }, 'createdAt');
       expect(func.validations.default).toBe('now()');

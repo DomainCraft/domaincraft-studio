@@ -9,6 +9,7 @@ export interface WasmParsedField {
   IsOptional: boolean;
   IsUnique: boolean;
   IsHidden: boolean;
+  IsReadonly: boolean;
   IsRequired: boolean;
   IsMany: boolean;
   OnDelete?: string;
@@ -120,6 +121,7 @@ function validateWasmParsedField(result: Record<string, unknown>): WasmParsedFie
     IsOptional: result.IsOptional as boolean,
     IsUnique: typeof result.IsUnique === 'boolean' ? result.IsUnique : false,
     IsHidden: typeof result.IsHidden === 'boolean' ? result.IsHidden : false,
+    IsReadonly: typeof result.IsReadonly === 'boolean' ? result.IsReadonly : false,
     IsRequired: typeof result.IsRequired === 'boolean' ? result.IsRequired : false,
     IsMany: typeof result.IsMany === 'boolean' ? result.IsMany : false,
     OnDelete: typeof result.OnDelete === 'string' ? result.OnDelete : undefined,

@@ -37,8 +37,14 @@ export interface AuthEndpoints {
    */
   register?: boolean;
 }
+/**
+ * An entity. Valid keys: old_name, features, fields, indexes, permissions, seed. There is no `relations:` key — relations are declared as fields of type `relation(Target)` (see the fields description).
+ */
 export interface EntityDefinition {
   features?: ('audit' | 'audit_log' | 'soft_delete' | 'optimistic_lock' | 'event_sourced' | 'cacheable')[];
+  /**
+   * Field definitions. Each value is a definition string: `type [modifiers]` (e.g. `string [required, max:255]`). Relations are fields, not a separate key: `relation(Target) [many]` for many-to-many, `relation(Target) [required, on_delete:cascade]`, `relation(Target) [optional, on_delete:set_null]`. `on_delete` accepts cascade|restrict|set_null|no_action. Flag modifiers: `required`, `optional`, `unique`, `hidden`, `readonly`, `primary`, `many`, `email`, `url`, `ipv4`. `hidden` excludes a field from API responses; `readonly` keeps it in responses but excludes it from create/update/patch requests (server-owned). Do not put a space after `:` inside the definition string (`default:5`, not `default: 5`); quoted string defaults are allowed (`default:"pending"`).
+   */
   fields: {
     [k: string]: string;
   };
@@ -74,7 +80,7 @@ export interface Project {
   name: string;
   pagination?: PaginationConfig;
   /**
-   * Target platform version (e.g. net9.0, net8.0)
+   * Target platform version (e.g. net10.0). Defaults to net10.0 for the csharp bridge.
    */
   platform?: string;
   rate_limit?: RateLimitConfig;

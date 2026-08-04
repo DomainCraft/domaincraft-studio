@@ -18,6 +18,7 @@ export function wasmFieldToParsed(wf: WasmParsedField, fallbackName: string): Pa
   if (wf.IsRequired) validations.required = 'true';
   if (wf.IsUnique) validations.unique = 'true';
   if (wf.IsHidden) validations.hidden = 'true';
+  if (wf.IsReadonly) validations.readonly = 'true';
   if (wf.IsOptional) validations.optional = 'true';
   if (wf.IsMany && wf.Type === 'relation') validations.many = 'true';
   if (wf.OnDelete) {
@@ -158,7 +159,7 @@ export function serializeDomainYaml(schema: DomainSchema, fieldOrder?: Record<st
   return stringify(raw, { indent: 2 });
 }
 
-const FIELD_FLAG_MODIFIERS = new Set(['required', 'unique', 'hidden', 'primary', 'optional', 'many', 'email', 'url', 'ipv4']);
+const FIELD_FLAG_MODIFIERS = new Set(['required', 'unique', 'hidden', 'readonly', 'primary', 'optional', 'many', 'email', 'url', 'ipv4']);
 
 export function serializeFieldDefinition(field: ParsedField): string {
   let typePart = field.type;

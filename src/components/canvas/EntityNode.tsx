@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Key, Lock } from 'lucide-react';
+import { Key, Lock, ShieldCheck } from 'lucide-react';
 import type { ParsedField } from '@/types/domain';
 import { featureConfig, type FeatureId } from '@/lib/features';
 import { featureIcons } from '@/lib/feature-icons';
@@ -62,6 +62,7 @@ function EntityNode({ data, selected }: NodeProps) {
           const TypeIcon = getTypeIcon(field.type);
           const isPrimary = field.validations?.primary === 'true';
           const isHidden = field.validations?.hidden === 'true';
+          const isReadonly = field.validations?.readonly === 'true';
 
           return (
             <div
@@ -79,6 +80,10 @@ function EntityNode({ data, selected }: NodeProps) {
               <span className={`truncate ${isPrimary ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-foreground'}`}>
                 {field.name}
               </span>
+
+              {isReadonly && (
+                <ShieldCheck size={10} className="text-sky-500 shrink-0" title="Readonly (server-owned)" />
+              )}
 
               {field.validations?.required === 'true' && (
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Required" />

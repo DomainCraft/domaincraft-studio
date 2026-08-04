@@ -86,7 +86,7 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
         <span className="text-xs font-semibold uppercase text-muted-foreground">Validations</span>
 
         <div className="grid grid-cols-2 gap-1.5">
-          {(['required', 'optional', 'unique', 'hidden', 'primary'] as const).map((key) => (
+          {(['required', 'optional', 'unique', 'hidden', 'readonly', 'primary'] as const).map((key) => (
             <Checkbox
               key={key}
               checked={localParsed.validations[key] === 'true'}
