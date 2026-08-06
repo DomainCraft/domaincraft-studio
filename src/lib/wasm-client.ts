@@ -13,6 +13,7 @@ export interface WasmParsedField {
   IsRequired: boolean;
   IsMany: boolean;
   OnDelete?: string;
+  OldName?: string;
   Validations: Record<string, string>;
   DefaultValue?: string;
   DefaultIsFunc: boolean;
@@ -125,6 +126,7 @@ function validateWasmParsedField(result: Record<string, unknown>): WasmParsedFie
     IsRequired: typeof result.IsRequired === 'boolean' ? result.IsRequired : false,
     IsMany: typeof result.IsMany === 'boolean' ? result.IsMany : false,
     OnDelete: typeof result.OnDelete === 'string' ? result.OnDelete : undefined,
+    OldName: typeof result.OldName === 'string' ? result.OldName : undefined,
     Validations: isRecord(result.Validations) ? result.Validations as Record<string, string> : {},
     DefaultValue: typeof result.DefaultValue === 'string' ? result.DefaultValue : undefined,
     DefaultIsFunc: typeof result.DefaultIsFunc === 'boolean' ? result.DefaultIsFunc : false,

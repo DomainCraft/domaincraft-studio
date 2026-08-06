@@ -39,8 +39,9 @@ function toWasmField(def: string, name: string): WasmParsedField {
     IsRequired: fallback.validations.required === 'true',
     IsMany: fallback.validations.many === 'true',
     OnDelete: fallback.validations.on_delete,
+    OldName: fallback.validations.old_name,
     Validations: Object.fromEntries(
-      Object.entries(fallback.validations).filter(([k]) => !['primary', 'optional', 'unique', 'hidden', 'readonly', 'required', 'many', 'on_delete', 'default'].includes(k))
+      Object.entries(fallback.validations).filter(([k]) => !['primary', 'optional', 'unique', 'hidden', 'readonly', 'required', 'many', 'on_delete', 'default', 'old_name'].includes(k))
     ),
     DefaultValue: isFunc ? rawDefault?.slice(0, -2) : rawDefault,
     DefaultIsFunc: isFunc,
@@ -62,6 +63,7 @@ const FIELD_CASES: Array<{ def: string; name: string }> = [
   { name: 'createdAt', def: 'datetime [default:now()]' },
   { name: 'roles', def: 'array(string) [required]' },
   { name: 'balance', def: 'decimal [required, readonly, gte:0]' },
+  { name: 'name', def: 'string [required, old_name:title]' },
 ];
 
 describe('WASM fallback parity', () => {

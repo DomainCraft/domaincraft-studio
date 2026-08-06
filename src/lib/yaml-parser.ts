@@ -24,6 +24,9 @@ export function wasmFieldToParsed(wf: WasmParsedField, fallbackName: string): Pa
   if (wf.OnDelete) {
     validations.on_delete = wf.OnDelete;
   }
+  if (wf.OldName) {
+    validations.old_name = wf.OldName;
+  }
   if (wf.DefaultValue) {
     validations.default = wf.DefaultIsFunc ? `${wf.DefaultValue}()` : wf.DefaultValue;
   }
