@@ -9,7 +9,7 @@ interface NumericBoundEditorProps {
 
 export default function NumericBoundEditor({ validations, onValidationChange }: NumericBoundEditorProps) {
   const clearAndSet = useCallback((keysToClear: string[], keyToSet: string) => {
-    const currentVal = validations[keyToSet] ?? '';
+    const currentVal = keysToClear.map(k => validations[k]).find(v => v !== undefined && v !== '') ?? '';
     for (const k of keysToClear) {
       onValidationChange(k, null);
     }

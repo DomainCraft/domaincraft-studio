@@ -1,4 +1,4 @@
-import { ReactFlow, Background, Controls, MiniMap, BackgroundVariant } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, BackgroundVariant, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import EntityNode from './EntityNode';
 import { edgeTypes, CrowFootMarkerDefs } from '@/components/edges/edge-types';
@@ -17,6 +17,8 @@ export default function Canvas() {
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const syncFromSchema = useCanvasStore((s) => s.syncFromSchema);
   const setSelectedNode = useCanvasStore((s) => s.setSelectedNode);
+  const layoutRevision = useCanvasStore((s) => s.layoutRevision);
+  const { fitView } = useReactFlow();
   const schemaVersion = useDomainStore((s) => s.schemaVersion);
   const entities = useDomainStore((s) => s.schema.entities);
   const selectEntity = useDomainStore((s) => s.selectEntity);
@@ -24,6 +26,7 @@ export default function Canvas() {
   const darkMode = useUIStore((s) => s.darkMode);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const prevVersionRef = useRef(schemaVersion);
+  const fitRef = useRef(layoutRevision);
 
   useEffect(() => {
     if (schemaVersion !== prevVersionRef.current) {
@@ -31,6 +34,15 @@ export default function Canvas() {
       syncFromSchema(entities, parseFieldDefinition);
     }
   }, [schemaVersion, entities, syncFromSchema]);
+
+  // Refit whenever the graph is laid out fresh (sample import / auto-layout),
+  // so newly-placed nodes are actually in view instead of hanging off-screen.
+  useEffect(() => {
+    if (layoutRevision !== fitRef.current && nodes.length > 0) {
+      fitRef.current = layoutRevision;
+      fitView({ padding: 0.2, duration: 300 });
+    }
+  }, [layoutRevision, nodes.length, fitView]);
 
   useEffect(() => {
     setSelectedNode(selectedEntity);
@@ -63,7 +75,9 @@ export default function Canvas() {
         fitView
         proOptions={{ hideAttribution: true }}
       >
-        {CrowFootMarkerDefs}
+        <svg width={0} height={0} style={{ position: 'absolute' }}>
+          {CrowFootMarkerDefs}
+        </svg>
         <Background
           variant={BackgroundVariant.Dots}
           gap={16}

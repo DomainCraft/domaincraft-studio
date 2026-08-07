@@ -42,6 +42,15 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
   const isNumeric = SPECMETA.numericFieldTypes.includes(localParsed.type);
   const canBeArray = !isRelation;
 
+  const flagItems: { key: string; disabledReason?: string }[] = [
+    { key: 'required', disabledReason: localParsed.validations['optional'] === 'true' ? 'Required and optional are mutually exclusive' : undefined },
+    { key: 'optional', disabledReason: localParsed.validations['required'] === 'true' ? 'Optional and required are mutually exclusive' : localParsed.validations['primary'] === 'true' ? 'Primary cannot be optional' : undefined },
+    { key: 'unique' },
+    { key: 'hidden' },
+    { key: 'readonly' },
+    { key: 'primary', disabledReason: localParsed.validations['optional'] === 'true' ? 'Primary cannot be optional' : undefined },
+  ];
+
   return (
     <div className="space-y-3">
       <span className="text-xs font-semibold uppercase text-muted-foreground">Field: {fieldName}</span>
@@ -86,12 +95,14 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
         <span className="text-xs font-semibold uppercase text-muted-foreground">Validations</span>
 
         <div className="grid grid-cols-2 gap-1.5">
-          {(['required', 'optional', 'unique', 'hidden', 'readonly', 'primary'] as const).map((key) => (
+          {flagItems.map(({ key, disabledReason }) => (
             <Checkbox
               key={key}
               checked={localParsed.validations[key] === 'true'}
               onChange={(checked) => updateValidation(key, checked ? 'true' : null)}
               label={key}
+              disabled={!!disabledReason}
+              hint={disabledReason}
             />
           ))}
         </div>
@@ -151,9 +162,14 @@ export default function FieldEditor({ entityName, fieldName }: { entityName: str
             onChange={(e) => updateValidation('on_delete', e.target.value || null)}
           >
             <option value="">None</option>
-            {SPECMETA.onDeleteValues.map((val) => (
-              <option key={val} value={val}>{val}</option>
-            ))}
+            {SPECMETA.onDeleteValues.map((val) => {
+              const disabledSetNull = val === 'set_null' && localParsed.validations['required'] === 'true';
+              return (
+                <option key={val} value={val} disabled={disabledSetNull} title={disabledSetNull ? `on_delete:set_null only works on optional relation fields` : undefined}>
+                  {val}{disabledSetNull ? ' (requires optional)' : ''}
+                </option>
+              );
+            })}
           </Select>
         )}
       </div>

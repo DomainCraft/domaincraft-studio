@@ -11,8 +11,8 @@ Open **[DomainCraft Studio](https://domaincraft.github.io/domaincraft-studio/)**
 ### Run Locally
 
 ```bash
-git clone https://github.com/DomainCraft/DomainCraftGui.git
-cd DomainCraftGui
+git clone https://github.com/DomainCraft/domaincraft-studio.git
+cd domaincraft-studio
 npm install
 npm run dev
 ```
@@ -86,4 +86,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, project structure,
 
 ## License
 
-Part of the [DomainCraft](https://github.com/Gitlawb/domaincraft) project.
+Part of the [DomainCraft](https://github.com/DomainCraft/DomainCraft) project.

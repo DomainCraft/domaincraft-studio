@@ -8,6 +8,8 @@ interface CrowFootData {
 
 function CrowFootEdgeInner({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -17,14 +19,20 @@ function CrowFootEdgeInner({
   data,
   style,
 }: EdgeProps) {
-  const [edgePath] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-  });
+  // Self-referencing relation: source and target handles sit on the same node
+  // (bottom source, top target), so a bezier between them collapses to a line
+  // behind the node. Draw an explicit loop arcing out to the right instead.
+  const isSelfLoop = source === target;
+  const edgePath = isSelfLoop
+    ? `M ${sourceX} ${sourceY} C ${sourceX + 90} ${sourceY}, ${targetX + 90} ${targetY}, ${targetX} ${targetY}`
+    : getBezierPath({
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+      })[0];
 
   const crowData = (data ?? {}) as CrowFootData;
   const sourceCardinality = crowData.sourceCardinality ?? 'one';

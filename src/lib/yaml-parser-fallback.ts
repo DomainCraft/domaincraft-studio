@@ -4,19 +4,21 @@ import type { DomainSchema, EntityDefinition, AuthConfig, ParsedField } from '@/
 export function parseFieldDefinitionFallback(name: string, def: string): ParsedField {
   const result: ParsedField = { name, type: '', validations: {} };
   const trimmed = def.trim();
-  const bracketMatch = trimmed.match(/\[([^\]]*)\]\s*$/);
-  if (bracketMatch && bracketMatch[1]) {
-    const parts = bracketMatch[1].split(',').map(p => p.trim());
+  const bracketContent = extractTrailingBracket(trimmed);
+  if (bracketContent !== null && bracketContent.length > 0) {
+    const parts = splitModifiers(bracketContent);
     for (const part of parts) {
-      const colonIdx = part.indexOf(':');
+      const p = part.trim();
+      if (!p) continue;
+      const colonIdx = p.indexOf(':');
       if (colonIdx > 0) {
-        result.validations[part.slice(0, colonIdx).trim()] = part.slice(colonIdx + 1).trim();
+        result.validations[p.slice(0, colonIdx).trim()] = p.slice(colonIdx + 1).trim();
       } else {
-        result.validations[part] = 'true';
+        result.validations[p] = 'true';
       }
     }
   }
-  const typePart = bracketMatch ? trimmed.slice(0, trimmed.indexOf('[')).trim() : trimmed;
+  const typePart = bracketContent !== null ? trimmed.slice(0, trimmed.indexOf('[')).trim() : trimmed;
   const parenMatch = typePart.match(/^(\w+)\(([^)]+)\)$/);
   if (parenMatch && parenMatch[1] && parenMatch[2]) {
     const rawType = parenMatch[1];
@@ -33,6 +35,70 @@ export function parseFieldDefinitionFallback(name: string, def: string): ParsedF
     result.type = typePart;
   }
   return result;
+}
+
+/**
+ * Extracts the trailing `[ ... ]` modifier clause (last balanced bracket that
+ * closes at the end of the string) and returns its inner content. Returns null
+ * when no such clause exists. Bracket-aware so that array default values like
+ * `default:[a, b, c]` are not mangled by a regex that stops at the first "]".
+ */
+function extractTrailingBracket(s: string): string | null {
+  if (s[s.length - 1] !== ']') return null;
+  let depth = 0;
+  for (let i = s.length - 1; i >= 0; i--) {
+    const c = s[i];
+    if (c === ']') {
+      depth++;
+    } else if (c === '[') {
+      depth--;
+      if (depth === 0) {
+        return s.slice(i + 1, s.length - 1);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Splits a modifier clause on commas while respecting square brackets (array
+ * defaults like `[a, b, c]`) and single/double quotes. Mirrors splitModifiers
+ * in the core Go lexer so the JS fallback parses exactly like the WASM path.
+ */
+function splitModifiers(s: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quote !== null) {
+      cur += c;
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '\'' || c === '"') {
+      quote = c;
+      cur += c;
+    } else if (c === '[') {
+      depth++;
+      cur += c;
+    } else if (c === ']') {
+      if (depth > 0) depth--;
+      cur += c;
+    } else if (c === ',') {
+      if (depth === 0) {
+        out.push(cur);
+        cur = '';
+      } else {
+        cur += c;
+      }
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
 }
 
 export function parseDomainYamlFallback(yamlText: string): DomainSchema {

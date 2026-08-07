@@ -17,11 +17,12 @@ export const CrowFootMarkerDefs = (
     >
       <line
         x1="6"
-        y1="0"
+        y1="1.5"
         x2="6"
-        y2="16"
+        y2="14.5"
         stroke="hsl(var(--muted-foreground))"
-        strokeWidth="1.5"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
     </marker>
     <marker
@@ -36,7 +37,7 @@ export const CrowFootMarkerDefs = (
       <path
         d="M 18 8 L 8 1 M 18 8 L 8 15 M 0 8 L 18 8"
         stroke="hsl(var(--muted-foreground))"
-        strokeWidth="1.5"
+        strokeWidth="2"
         fill="none"
       />
     </marker>
